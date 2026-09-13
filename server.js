@@ -377,6 +377,11 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`KisanSetu server running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  server.listen(PORT, () => {
+    console.log(`KisanSetu server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
+module.exports.server = server;
