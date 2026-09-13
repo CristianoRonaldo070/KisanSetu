@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             case 'revenue': renderRevenueTab(); break;
             case 'stock': renderStockTab(); break;
             case 'delivery': renderDeliveryTab(); break;
+            case 'procurement': renderProcurementTab(); break;
             case 'chat-requests': renderChatTab(); break;
             case 'profile': renderProfileTab(); break;
         }
@@ -93,6 +94,10 @@ function updateFarmerTabTitles(tab) {
             titleEl.textContent = tr('head_chat_title', 'Chat & Requests');
             subEl.textContent = tr('head_chat_sub', 'Connect with consumers and fellow farmers.');
             break;
+        case 'procurement':
+            titleEl.textContent = tr('head_procurement_title', 'Mandi Procurement & Queue');
+            subEl.textContent = tr('head_procurement_sub', 'Book slots at APMC mandis, track your queue position & MSP payments.');
+            break;
         case 'profile':
             titleEl.textContent = tr('head_profile_title', 'Your Profile');
             subEl.textContent = tr('head_profile_sub', 'Update your personal info and location.');
@@ -117,6 +122,7 @@ function setupNav() {
                 case 'revenue': renderRevenueTab(); break;
                 case 'stock': renderStockTab(); break;
                 case 'delivery': renderDeliveryTab(); break;
+                case 'procurement': renderProcurementTab(); break;
                 case 'chat-requests': renderChatTab(); break;
                 case 'profile': renderProfileTab(); break;
             }
@@ -950,6 +956,380 @@ async function saveProfile() {
         console.error('Save profile error:', e);
         toast('Error saving profile', '❌');
     }
+}
+
+// ─── Procurement Center: Slot Booking, Queue & Payment Tracking ───
+const PROCUREMENT_CENTERS = [
+  { id:'apmc-pune', name:'APMC Pune Market Yard Kendra', address:'Gultekdi, Market Yard Rd, Pune 411037, MH', hours:'7:00 AM – 5:00 PM', bays:4, crops:['Wheat','Onions','Soybeans','Turmeric'], lat:18.497, lng:73.874 },
+  { id:'kums-lasalgaon', name:'Krishi Upaj Mandi Samiti', address:'Lasalgaon, Nashik District 422306, MH', hours:'6:30 AM – 4:30 PM', bays:6, crops:['Onions','Wheat','Soybeans','Cotton'], lat:20.144, lng:74.233 },
+  { id:'apmc-vashi', name:'APMC Vashi Grain Terminal', address:'Turbhe, Navi Mumbai 400703, MH', hours:'8:00 AM – 6:00 PM', bays:3, crops:['Wheat','Basmati Rice','Soybeans','Turmeric'], lat:19.075, lng:73.001 },
+  { id:'baramati-mandi', name:'Baramati Agro Mandi Kendra', address:'Baramati, Pune District 413102, MH', hours:'7:30 AM – 5:30 PM', bays:3, crops:['Wheat','Onions','Cotton','Turmeric'], lat:18.152, lng:74.577 }
+];
+
+const PROCUREMENT_CROPS = [
+  { name:'Wheat', msp:2275, emoji:'🌾' },
+  { name:'Basmati Rice', msp:2183, emoji:'🍚' },
+  { name:'Onions', msp:1350, emoji:'🧅' },
+  { name:'Soybeans', msp:4600, emoji:'🫘' },
+  { name:'Turmeric', msp:9200, emoji:'🟠' },
+  { name:'Cotton', msp:7020, emoji:'🧶' }
+];
+
+const PROCUREMENT_SLOTS = [
+  '09:00 AM – 10:30 AM',
+  '10:30 AM – 12:00 PM',
+  '01:00 PM – 02:30 PM',
+  '02:30 PM – 04:00 PM'
+];
+
+const PROC_STAGES = ['confirmed','gate','weighbridge','complete','payment'];
+
+let procQueueTimer = null;
+
+function getProcBookings() {
+  try { return JSON.parse(localStorage.getItem('ks_proc_bookings') || '[]'); } catch { return []; }
+}
+function saveProcBookings(arr) {
+  localStorage.setItem('ks_proc_bookings', JSON.stringify(arr));
+}
+
+function renderProcurementTab() {
+  if (procQueueTimer) { clearInterval(procQueueTimer); procQueueTimer = null; }
+  const bookings = getProcBookings();
+  const active = bookings.filter(b => b.stage !== 'payment');
+  const completed = bookings.filter(b => b.stage === 'payment');
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+  let html = '';
+
+  // ── Centers section ──
+  html += `<div class="panel" style="margin-bottom:18px;">
+    <h3 style="color:var(--marigold); margin-bottom:14px;">${tr('proc_section_centers','📍 Procurement Centers')}</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px;">`;
+  PROCUREMENT_CENTERS.forEach(c => {
+    html += `<div class="procurement-card">
+      <div style="font-weight:700; font-size:.95rem; color:var(--leaf-bright); margin-bottom:6px;">🏛️ ${c.name}</div>
+      <div style="font-size:.78rem; color:var(--cream-dim); margin-bottom:4px;">📍 ${c.address}</div>
+      <div style="font-size:.78rem; color:var(--cream-dim);">🕐 ${tr('proc_open_hours','Operating Hours')}: ${c.hours}</div>
+      <div style="font-size:.78rem; color:var(--cream-dim);">⚖️ ${tr('proc_bays_active','Active Bays')}: ${c.bays}</div>
+      <div style="font-size:.78rem; color:var(--cream-dim); margin-top:4px;">🌾 ${tr('proc_crops_accepted','Crops Accepted')}: ${c.crops.join(', ')}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // ── Booking form ──
+  html += `<div class="panel" style="margin-bottom:18px;">
+    <h3 style="color:var(--marigold); margin-bottom:14px;">${tr('proc_section_book','📝 Book a Slot')}</h3>
+    <div class="form-grid" style="gap:14px;">
+      <div class="form-field">
+        <label>${tr('proc_center','Select Center')}</label>
+        <select class="plain" id="proc-center">
+          ${PROCUREMENT_CENTERS.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field">
+        <label>${tr('proc_date','Date')}</label>
+        <select class="plain" id="proc-date">
+          <option value="${todayStr}">${tr('proc_today','Today')} (${todayStr})</option>
+          <option value="${tomorrowStr}">${tr('proc_tomorrow','Tomorrow')} (${tomorrowStr})</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>${tr('proc_slot','Time Slot')}</label>
+        <select class="plain" id="proc-slot">
+          ${PROCUREMENT_SLOTS.map(s => `<option value="${s}">${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field">
+        <label>${tr('proc_crop','Crop')}</label>
+        <select class="plain" id="proc-crop" onchange="updateProcMSP()">
+          ${PROCUREMENT_CROPS.map(c => `<option value="${c.name}" data-msp="${c.msp}">${c.emoji} ${c.name} — ₹${c.msp.toLocaleString('en-IN')}${tr('proc_per_quintal','/quintal')}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field">
+        <label>${tr('proc_qty','Quantity (Quintals)')}</label>
+        <input type="number" class="plain" id="proc-qty" min="1" max="500" value="10" oninput="updateProcMSP()" placeholder="e.g. 10">
+      </div>
+      <div class="form-field">
+        <label>${tr('proc_vehicle','Vehicle Number (Optional)')}</label>
+        <input type="text" class="plain" id="proc-vehicle" placeholder="e.g. MH-12-AB-4521">
+      </div>
+      <div class="form-field" style="grid-column:1/-1;">
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+          <div style="font-size:.85rem; color:var(--cream-dim);">${tr('proc_msp_rate','MSP Rate')}: <strong id="proc-msp-display" style="color:var(--leaf-bright);">₹2,275/quintal</strong></div>
+          <div style="font-size:.85rem; color:var(--cream-dim);">${tr('proc_estimated_payout','Est. Payout')}: <strong id="proc-payout-display" style="color:var(--marigold);">₹22,750</strong></div>
+        </div>
+      </div>
+      <div class="form-field" style="grid-column:1/-1;">
+        <button class="btn btn-primary" onclick="bookProcurementSlot()" style="width:100%;">${tr('proc_book_btn','🏛️ Book Slot')}</button>
+      </div>
+    </div>
+  </div>`;
+
+  // ── Active bookings ──
+  html += `<div class="panel" style="margin-bottom:18px;">
+    <h3 style="color:var(--marigold); margin-bottom:14px;">${tr('proc_section_active','🎫 Your Active Booking')}</h3>
+    <div id="proc-active-list">`;
+  if (active.length === 0) {
+    html += `<p style="color:var(--cream-dim); font-size:.85rem;">${tr('proc_no_active','No active bookings. Book a slot above to get started!')}</p>`;
+  } else {
+    active.forEach(b => { html += renderProcActiveCard(b); });
+  }
+  html += `</div></div>`;
+
+  // ── Completed procurements ──
+  html += `<div class="panel" style="margin-bottom:18px;">
+    <h3 style="color:var(--marigold); margin-bottom:14px;">${tr('proc_section_completed','✅ Completed Procurements')}</h3>
+    <div id="proc-completed-list">`;
+  if (completed.length === 0) {
+    html += `<p style="color:var(--cream-dim); font-size:.85rem;">${tr('proc_no_completed','No completed procurements yet.')}</p>`;
+  } else {
+    completed.forEach(b => { html += renderProcCompletedCard(b); });
+  }
+  html += `</div></div>`;
+
+  contentEl.innerHTML = html;
+  updateProcMSP();
+
+  // Start auto-advance timer
+  if (active.length > 0) {
+    procQueueTimer = setInterval(() => {
+      simulateQueueAdvance(false);
+    }, 50000); // ~50 seconds
+  }
+}
+
+function updateProcMSP() {
+  const sel = document.getElementById('proc-crop');
+  const qtyEl = document.getElementById('proc-qty');
+  const mspDisp = document.getElementById('proc-msp-display');
+  const payDisp = document.getElementById('proc-payout-display');
+  if (!sel || !qtyEl || !mspDisp || !payDisp) return;
+  const opt = sel.options[sel.selectedIndex];
+  const msp = parseInt(opt.dataset.msp) || 2275;
+  const qty = parseFloat(qtyEl.value) || 0;
+  mspDisp.textContent = `₹${msp.toLocaleString('en-IN')}${tr('proc_per_quintal','/quintal')}`;
+  payDisp.textContent = `₹${(msp * qty).toLocaleString('en-IN')}`;
+}
+
+function renderProcActiveCard(b) {
+  const center = PROCUREMENT_CENTERS.find(c => c.id === b.centerId) || PROCUREMENT_CENTERS[0];
+  const crop = PROCUREMENT_CROPS.find(c => c.name === b.cropName) || PROCUREMENT_CROPS[0];
+  const stageIdx = PROC_STAGES.indexOf(b.stage);
+  const farmersAhead = Math.max(0, b.currentToken ? (b.token - b.currentToken - 1) : b.farmersAhead);
+  const waitMin = farmersAhead * 8;
+
+  let stageLabels = [
+    tr('proc_status_confirmed','Slot Confirmed'),
+    tr('proc_status_gate','Gate Entry'),
+    tr('proc_status_weighbridge','Weighbridge & Inspection'),
+    tr('proc_status_complete','Procurement Complete'),
+    tr('proc_status_payment','DBT Payment Released')
+  ];
+
+  let stepperHtml = '<div class="proc-stepper">';
+  stageLabels.forEach((label, i) => {
+    const cls = i < stageIdx ? 'done' : (i === stageIdx ? 'active' : '');
+    stepperHtml += `<div class="proc-step ${cls}"><div class="proc-step-dot">${i < stageIdx ? '✓' : (i + 1)}</div><div class="proc-step-label">${label}</div></div>`;
+    if (i < stageLabels.length - 1) stepperHtml += `<div class="proc-step-line ${i < stageIdx ? 'done' : ''}"></div>`;
+  });
+  stepperHtml += '</div>';
+
+  return `<div class="procurement-card proc-active-card" data-booking-id="${b.id}">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <div>
+        <div style="font-weight:700; font-size:1rem; color:var(--leaf-bright);">${center.name}</div>
+        <div style="font-size:.78rem; color:var(--cream-dim);">📍 ${center.address}</div>
+        <div style="font-size:.78rem; color:var(--cream-dim); margin-top:4px;">📅 ${b.date} &nbsp;|&nbsp; 🕐 ${b.slot}</div>
+      </div>
+      <div class="token-pill">TK-${String(b.token).padStart(3,'0')}</div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:14px;">
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_crop','Crop')}</div>
+        <div class="proc-stat-val">${crop.emoji} ${b.cropName}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_qty','Quantity')}</div>
+        <div class="proc-stat-val">${b.qty} ${tr('proc_quintal','quintals')}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_estimated_payout','Est. Payout')}</div>
+        <div class="proc-stat-val" style="color:var(--marigold);">₹${(crop.msp * b.qty).toLocaleString('en-IN')}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_vehicle','Vehicle')}</div>
+        <div class="proc-stat-val">${b.vehicle || '—'}</div>
+      </div>
+    </div>
+    <div class="live-counter-board">
+      <div class="queue-counter">
+        <div class="queue-counter-label">${tr('proc_token','Your Token')}</div>
+        <div class="queue-counter-val token-big">TK-${String(b.token).padStart(3,'0')}</div>
+      </div>
+      <div class="queue-counter">
+        <div class="queue-counter-label">${tr('proc_serving','Currently Serving')}</div>
+        <div class="queue-counter-val serving-big">TK-${String(b.currentToken).padStart(3,'0')}</div>
+      </div>
+      <div class="queue-counter">
+        <div class="queue-counter-label">${tr('proc_ahead','Farmers Ahead')}</div>
+        <div class="queue-counter-val ahead-big">${farmersAhead}</div>
+      </div>
+      <div class="queue-counter">
+        <div class="queue-counter-label">${tr('proc_wait','Est. Wait Time')}</div>
+        <div class="queue-counter-val wait-big">${waitMin > 0 ? waitMin + ' ' + tr('proc_minutes','min') : '—'}</div>
+      </div>
+    </div>
+    ${stepperHtml}
+    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+      <button class="btn btn-water btn-sm" onclick="simulateQueueAdvance(true)">${tr('proc_fast_forward','⏩ Fast Forward (Demo)')}</button>
+      <button class="btn btn-ghost btn-sm" onclick="cancelProcurementSlot('${b.id}')" style="color:var(--danger);">${tr('proc_cancel_btn','Cancel Booking')}</button>
+    </div>
+  </div>`;
+}
+
+function renderProcCompletedCard(b) {
+  const center = PROCUREMENT_CENTERS.find(c => c.id === b.centerId) || PROCUREMENT_CENTERS[0];
+  const crop = PROCUREMENT_CROPS.find(c => c.name === b.cropName) || PROCUREMENT_CROPS[0];
+  const netWeight = (b.qty * 0.97).toFixed(1);
+  const totalPayout = Math.round(crop.msp * parseFloat(netWeight));
+
+  return `<div class="procurement-card proc-completed-card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+      <div>
+        <div style="font-weight:700; font-size:.95rem; color:var(--leaf-bright);">${center.name}</div>
+        <div style="font-size:.78rem; color:var(--cream-dim);">📅 ${b.date} &nbsp;|&nbsp; 🕐 ${b.slot}</div>
+      </div>
+      <div class="token-pill" style="background:var(--leaf); color:#fff;">TK-${String(b.token).padStart(3,'0')}</div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:14px;">
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_crop','Crop')}</div>
+        <div class="proc-stat-val">${crop.emoji} ${b.cropName}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_quality','Quality Grade')}</div>
+        <div class="proc-stat-val" style="color:var(--leaf-bright);">Grade A (FAQ)</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_net_weight','Net Weighed')}</div>
+        <div class="proc-stat-val">${netWeight} ${tr('proc_quintal','quintals')}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_total_payout','Total Payout')}</div>
+        <div class="proc-stat-val" style="color:var(--marigold); font-weight:700;">₹${totalPayout.toLocaleString('en-IN')}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_bay','Weighbridge Bay')}</div>
+        <div class="proc-stat-val">Bay ${b.bay || 2}</div>
+      </div>
+      <div class="proc-stat-box">
+        <div class="proc-stat-label">${tr('proc_dbt_status','DBT Status')}</div>
+        <div class="proc-stat-val" style="color:var(--leaf-bright); font-size:.78rem;">${tr('proc_dbt_credited','✅ Credited via PFMS to Bank A/C ****4129')}</div>
+      </div>
+      <div class="proc-stat-box" style="grid-column:1/-1;">
+        <div class="proc-stat-label">${tr('proc_txn_ref','Txn Ref')}</div>
+        <div class="proc-stat-val" style="font-family:monospace; font-size:.78rem; color:var(--water-bright);">PFMS/${b.date?.replace(/-/g,'')}/${String(b.token).padStart(3,'0')}/${Math.random().toString(36).substring(2,8).toUpperCase()}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bookProcurementSlot() {
+  const centerId = document.getElementById('proc-center').value;
+  const date = document.getElementById('proc-date').value;
+  const slot = document.getElementById('proc-slot').value;
+  const cropName = document.getElementById('proc-crop').value;
+  const qty = parseFloat(document.getElementById('proc-qty').value) || 0;
+  const vehicle = document.getElementById('proc-vehicle').value.trim();
+
+  if (qty <= 0) { toast('Please enter a valid quantity', '⚠️'); return; }
+
+  const bookings = getProcBookings();
+  const activeExists = bookings.some(b => b.stage !== 'payment');
+  if (activeExists) { toast('You already have an active booking. Complete or cancel it first.', '⚠️'); return; }
+
+  const token = 38 + Math.floor(Math.random() * 12) + 1; // token 39-50
+  const currentToken = token - (2 + Math.floor(Math.random() * 4)); // 2-5 ahead
+  const center = PROCUREMENT_CENTERS.find(c => c.id === centerId);
+  const bay = Math.floor(Math.random() * (center?.bays || 3)) + 1;
+
+  const booking = {
+    id: 'proc_' + Date.now(),
+    centerId,
+    date,
+    slot,
+    cropName,
+    qty,
+    vehicle,
+    token,
+    currentToken,
+    farmersAhead: token - currentToken - 1,
+    stage: 'confirmed',
+    bay,
+    createdAt: new Date().toISOString()
+  };
+
+  bookings.push(booking);
+  saveProcBookings(bookings);
+  toast(tr('proc_booked_success','Slot booked successfully! 🎉 Your token: ') + `TK-${String(token).padStart(3,'0')}`, '🏛️');
+  renderProcurementTab();
+}
+
+function cancelProcurementSlot(bookingId) {
+  let bookings = getProcBookings();
+  bookings = bookings.filter(b => b.id !== bookingId);
+  saveProcBookings(bookings);
+  toast(tr('proc_cancelled','Booking cancelled.'), '🗑️');
+  renderProcurementTab();
+}
+
+function simulateQueueAdvance(instant) {
+  let bookings = getProcBookings();
+  let changed = false;
+  bookings.forEach(b => {
+    if (b.stage === 'payment') return;
+    const stageIdx = PROC_STAGES.indexOf(b.stage);
+
+    if (instant) {
+      // Fast forward: advance stage
+      if (stageIdx < PROC_STAGES.length - 1) {
+        b.stage = PROC_STAGES[stageIdx + 1];
+        // Also advance queue counters
+        if (b.currentToken < b.token) {
+          b.currentToken = Math.min(b.token, b.currentToken + 1);
+          b.farmersAhead = Math.max(0, b.token - b.currentToken - 1);
+        }
+        changed = true;
+        if (b.stage === 'weighbridge' && b.currentToken >= b.token - 1) {
+          toast(tr('proc_alert_called','🔔 Your token is being called! Proceed to Weighbridge Bay.'), '🔔');
+        }
+      }
+    } else {
+      // Automatic: advance queue by 1 token
+      if (b.currentToken < b.token) {
+        b.currentToken += 1;
+        b.farmersAhead = Math.max(0, b.token - b.currentToken - 1);
+        changed = true;
+        // Auto-advance stage when it's your turn
+        if (b.currentToken >= b.token - 1 && stageIdx < 2) {
+          b.stage = PROC_STAGES[stageIdx + 1];
+          if (b.stage === 'weighbridge') {
+            toast(tr('proc_alert_called','🔔 Your token is being called! Proceed to Weighbridge Bay.'), '🔔');
+          }
+        }
+      } else if (stageIdx < PROC_STAGES.length - 1) {
+        b.stage = PROC_STAGES[stageIdx + 1];
+        changed = true;
+      }
+    }
+  });
+  if (changed) {
+    saveProcBookings(bookings);
+    renderProcurementTab();
+  }
 }
 
 // Chat Drawer Logic
