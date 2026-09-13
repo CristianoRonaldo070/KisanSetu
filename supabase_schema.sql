@@ -99,10 +99,15 @@ ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
     DROP POLICY IF EXISTS "Users can read all profiles" ON profiles;
     DROP POLICY IF EXISTS "Users can update their own profile" ON profiles;
+    DROP POLICY IF EXISTS "Users can insert their own profile" ON profiles;
+    DROP POLICY IF EXISTS "Anyone can read profiles" ON profiles;
+    DROP POLICY IF EXISTS "Authenticated users can insert profile" ON profiles;
+    DROP POLICY IF EXISTS "Authenticated users can update profile" ON profiles;
 EXCEPTION WHEN OTHERS THEN END $$;
 
-CREATE POLICY "Users can read all profiles" ON profiles FOR SELECT USING (true);
-CREATE POLICY "Users can update their own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "Anyone can read profiles" ON profiles FOR SELECT USING (true);
+CREATE POLICY "Authenticated users can insert profile" ON profiles FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
+CREATE POLICY "Authenticated users can update profile" ON profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
 -- products
 DO $$ BEGIN
@@ -110,12 +115,15 @@ DO $$ BEGIN
     DROP POLICY IF EXISTS "Farmers can insert their own products" ON products;
     DROP POLICY IF EXISTS "Farmers can update their own products" ON products;
     DROP POLICY IF EXISTS "Farmers can delete their own products" ON products;
+    DROP POLICY IF EXISTS "Authenticated can insert products" ON products;
+    DROP POLICY IF EXISTS "Authenticated can update products" ON products;
+    DROP POLICY IF EXISTS "Authenticated can delete products" ON products;
 EXCEPTION WHEN OTHERS THEN END $$;
 
 CREATE POLICY "Anyone can read products" ON products FOR SELECT USING (true);
-CREATE POLICY "Farmers can insert their own products" ON products FOR INSERT WITH CHECK (auth.uid() = farmer_id);
-CREATE POLICY "Farmers can update their own products" ON products FOR UPDATE USING (auth.uid() = farmer_id);
-CREATE POLICY "Farmers can delete their own products" ON products FOR DELETE USING (auth.uid() = farmer_id);
+CREATE POLICY "Authenticated can insert products" ON products FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Authenticated can update products" ON products FOR UPDATE TO authenticated USING (auth.uid() = farmer_id);
+CREATE POLICY "Authenticated can delete products" ON products FOR DELETE TO authenticated USING (auth.uid() = farmer_id);
 
 -- chat_requests
 DO $$ BEGIN
@@ -199,9 +207,10 @@ BEGIN
     INSERT INTO public.profiles (id, role, full_name)
     VALUES (
         new.id,
-        COALESCE(new.raw_user_meta_data->>'role', 'consumer'),
-        COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', '')
-    );
+        COALESCE(new.raw_user_meta_data->>'role', 'farmer'),
+        COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', 'User')
+    )
+    ON CONFLICT (id) DO NOTHING;
     RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -227,3 +236,13 @@ DROP TRIGGER IF EXISTS on_chat_request_accepted ON chat_requests;
 CREATE TRIGGER on_chat_request_accepted
     AFTER UPDATE ON chat_requests
     FOR EACH ROW EXECUTE PROCEDURE create_conversation_on_accept();
+
+-- Backfill any existing users from auth.users into profiles
+INSERT INTO public.profiles (id, role, full_name)
+SELECT 
+    id, 
+    COALESCE(raw_user_meta_data->>'role', 'farmer'),
+    COALESCE(raw_user_meta_data->>'full_name', raw_user_meta_data->>'name', 'User')
+FROM auth.users
+ON CONFLICT (id) DO NOTHING;
+

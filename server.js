@@ -15,7 +15,10 @@ const io = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'] }
 });
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const supabase = createClient(process.env.SUPABASE_URL, supabaseKey, {
+  auth: { persistSession: false }
+});
 const upload = multer({ storage: multer.memoryStorage() });
 
 const publicDir = path.join(__dirname, 'public');
@@ -62,6 +65,9 @@ const authMiddleware = async (req, res, next) => {
 
 // Helper for scoped client that carries user authorization for RLS
 const getUserClient = (req) => {
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return supabase;
+  }
   const authHeader = req.headers.authorization;
   if (!authHeader) return supabase;
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
