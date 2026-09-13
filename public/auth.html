@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KisanSetu — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-card">
+      <!-- Logo/Brand at top -->
+      <div style="text-align:center; margin-bottom:20px;">
+        <div class="brand" style="justify-content:center; font-size:1.4rem;"><span class="dot"></span>KisanSetu</div>
+      </div>
+      
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="auth-sub" id="auth-sub">Sign in to continue to KisanSetu</p>
+      
+      <div class="auth-error" id="auth-error"></div>
+      
+      <!-- Sign In / Sign Up tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchTab('signin')">Sign In</button>
+        <button class="auth-tab" onclick="switchTab('signup')">Sign Up</button>
+      </div>
+      
+      <!-- Sign In Form -->
+      <form class="auth-form" id="signin-form" onsubmit="handleSignIn(event)">
+        <div class="form-field">
+          <label>Email</label>
+          <input type="email" class="plain" id="si-email" placeholder="your@email.com" required>
+        </div>
+        <div class="form-field">
+          <label>Password</label>
+          <input type="password" class="plain" id="si-password" placeholder="Your password" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:14px;">Sign In</button>
+      </form>
+      
+      <!-- Sign Up Form (hidden by default) -->
+      <form class="auth-form hidden" id="signup-form" onsubmit="handleSignUp(event)">
+        <div class="form-field">
+          <label>Full Name</label>
+          <input type="text" class="plain" id="su-name" placeholder="Your full name" required>
+        </div>
+        <div class="form-field">
+          <label>Email</label>
+          <input type="email" class="plain" id="su-email" placeholder="your@email.com" required>
+        </div>
+        <div class="form-field">
+          <label>Password</label>
+          <input type="password" class="plain" id="su-password" placeholder="Min 6 characters" required minlength="6">
+        </div>
+        <div class="form-field">
+          <label>I am a...</label>
+          <div class="role-selector">
+            <button type="button" class="role-option selected" data-role="farmer" onclick="selectRole(this)">
+              <span class="role-emoji">🧑‍🌾</span>
+              <span class="role-label">Farmer</span>
+            </button>
+            <button type="button" class="role-option" data-role="consumer" onclick="selectRole(this)">
+              <span class="role-emoji">🛒</span>
+              <span class="role-label">Consumer</span>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:14px;">Create Account</button>
+      </form>
+      
+      <div class="auth-divider">or continue with</div>
+      
+      <!-- Google Sign In -->
+      <button class="google-btn" onclick="handleGoogleSignIn()">
+        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+        Sign in with Google
+      </button>
+      
+      <!-- Role selector for Google signup (shown when needed) -->
+      <div class="hidden" id="google-role-picker" style="margin-top:16px;">
+        <p style="font-size:.82rem; color:var(--cream-dim); margin-bottom:10px; text-align:center;">Select your role for Google sign-up:</p>
+        <div class="role-selector">
+          <button type="button" class="role-option selected" data-role="farmer" onclick="selectGoogleRole(this)">
+            <span class="role-emoji">🧑‍🌾</span>
+            <span class="role-label">Farmer</span>
+          </button>
+          <button type="button" class="role-option" data-role="consumer" onclick="selectGoogleRole(this)">
+            <span class="role-emoji">🛒</span>
+            <span class="role-label">Consumer</span>
+          </button>
+        </div>
+      </div>
+      
+      <div class="auth-footer">
+        <a href="/">← Back to KisanSetu</a>
+      </div>
+      
+      <div style="text-align:center; margin-top:16px; font-size:.72rem; color:var(--cream-dim);">
+        Developed by <span style="color:var(--marigold); font-weight:700;">Cursed Coders</span>
+      </div>
+    </div>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script src="/js/auth.js"></script>
+  <script>
+    let currentTab = 'signin';
+    let selectedRole = 'farmer';
+    let googleRole = 'farmer';
+    
+    // Check if this is a callback from Google OAuth
+    (async function() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('callback') === 'true') {
+        // Handle OAuth callback
+        await KS_AUTH.handleCallback();
+        await KS_AUTH.redirectToDashboard();
+        return;
+      }
+      // If already logged in, redirect
+      const session = await KS_AUTH.getSession();
+      if (session) {
+        await KS_AUTH.redirectToDashboard();
+      }
+    })();
+    
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('signin-form').classList.toggle('hidden', tab !== 'signin');
+      document.getElementById('signup-form').classList.toggle('hidden', tab !== 'signup');
+      document.getElementById('auth-title').textContent = tab === 'signin' ? 'Welcome back' : 'Create account';
+      document.getElementById('auth-sub').textContent = tab === 'signin' ? 'Sign in to continue to KisanSetu' : 'Join KisanSetu as a farmer or consumer';
+      hideError();
+    }
+    
+    function selectRole(el) {
+      document.querySelectorAll('#signup-form .role-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedRole = el.dataset.role;
+    }
+    
+    function selectGoogleRole(el) {
+      document.querySelectorAll('#google-role-picker .role-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+      googleRole = el.dataset.role;
+    }
+    
+    function showError(msg) {
+      const el = document.getElementById('auth-error');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+    function hideError() {
+      document.getElementById('auth-error').classList.remove('show');
+    }
+    
+    async function handleSignIn(e) {
+      e.preventDefault();
+      hideError();
+      const email = document.getElementById('si-email').value;
+      const password = document.getElementById('si-password').value;
+      const { data, error } = await KS_AUTH.signIn(email, password);
+      if (error) {
+        showError(error.message);
+        return;
+      }
+      await KS_AUTH.redirectToDashboard();
+    }
+    
+    async function handleSignUp(e) {
+      e.preventDefault();
+      hideError();
+      const name = document.getElementById('su-name').value;
+      const email = document.getElementById('su-email').value;
+      const password = document.getElementById('su-password').value;
+      const { data, error } = await KS_AUTH.signUp(email, password, selectedRole, name);
+      if (error) {
+        showError(error.message);
+        return;
+      }
+      if (data.user && !data.session) {
+        showError('Check your email for a confirmation link!');
+        document.getElementById('auth-error').style.background = 'rgba(127,166,83,0.14)';
+        document.getElementById('auth-error').style.color = 'var(--leaf-bright)';
+      } else {
+        await KS_AUTH.redirectToDashboard();
+      }
+    }
+    
+    async function handleGoogleSignIn() {
+      // For Google sign-in, we need to know the role
+      // Show role picker first if on signup tab, otherwise just sign in
+      const role = currentTab === 'signup' ? selectedRole : googleRole;
+      const { error } = await KS_AUTH.signInWithGoogle(role);
+      if (error) showError(error.message);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KisanSetu — Farmer Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body style="display:flex; height:100vh; overflow:hidden;">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>KisanSetu</div>
+    <div class="side-nav" id="farmer-nav">
+      <button data-tab="products" class="active"><span class="ic">🌱</span>Products</button>
+      <button data-tab="revenue"><span class="ic">📈</span>Revenue</button>
+      <button data-tab="stock"><span class="ic">📦</span>Stock</button>
+      <button data-tab="delivery"><span class="ic">🚚</span>Delivery</button>
+      <button data-tab="chat-requests"><span class="ic">💬</span>Chat</button>
+      <button data-tab="profile"><span class="ic">👤</span>Profile</button>
+    </div>
+    <div class="sidebar-foot">
+      <div class="role-pill"><span class="avatar" id="farmer-avatar-pill">🧑🌾</span><span id="farmer-name-pill">Farmer</span></div>
+      <button class="exit-btn" onclick="KS_AUTH.signOut()">🚪 Sign Out</button>
+    </div>
+  </aside>
+  
+  <!-- Main content -->
+  <div class="main-col">
+    <header class="topheader">
+      <div>
+        <h2 id="farmer-tab-title">Your Products</h2>
+        <div class="sub" id="farmer-tab-sub">Add crops, tweak prices, retire what's sold out.</div>
+      </div>
+      <button class="btn btn-primary" id="add-product-btn" onclick="openProductModal()">+ Add a crop</button>
+    </header>
+    <div class="main-scroll" id="farmer-content"></div>
+  </div>
+  
+  <!-- Product Modal -->
+  <div class="modal-back" id="product-modal">
+    <div class="modal-box">
+      <h3 id="modal-title">Add a crop</h3>
+      <input type="hidden" id="edit-product-id">
+      <div class="form-grid">
+        <div class="form-field" style="grid-column:1/-1;"><label>Crop name</label><input type="text" class="plain" id="f-name" placeholder="e.g. Alphonso Mangoes"></div>
+        <div class="form-field"><label>Category</label><select class="plain" id="f-category"><option>Vegetable</option><option>Fruit</option><option>Grain</option><option>Spice</option><option>Dairy</option></select></div>
+        <div class="form-field"><label>Unit</label><select class="plain" id="f-unit"><option>kg</option><option>pc</option><option>dozen</option><option>litre</option></select></div>
+        <div class="form-field"><label>Your price (₹)</label><input type="number" class="plain" id="f-price" min="0" placeholder="e.g. 40"></div>
+        <div class="form-field"><label>Cost to grow (₹)</label><input type="number" class="plain" id="f-cost" min="0" placeholder="e.g. 22"></div>
+        <div class="form-field" style="grid-column:1/-1;"><label>Stock available</label><input type="number" class="plain" id="f-stock" min="0" placeholder="e.g. 60"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProduct()">Save crop</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Chat Drawer -->
+  <div class="drawer" id="chat-drawer">
+    <div class="drawer-head">
+      <div class="chat-header-info"><span id="chat-avatar">🧑🌾</span><div><div style="font-weight:700; font-size:.9rem;" id="chat-name">User</div><div class="lr-sub" id="chat-status">Online</div></div></div>
+      <button class="drawer-close" onclick="closeChat()">✕</button>
+    </div>
+    <div class="drawer-body"><div class="chat-msgs" id="chat-msgs"></div></div>
+    <div class="drawer-foot">
+      <div class="chat-input-row">
+        <input type="text" class="plain" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChatMessage()">
+        <button class="btn btn-water btn-sm" onclick="sendChatMessage()">Send</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Toast -->
+  <div id="toast-stack"></div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/farmer-app.js"></script>
+</body>
+</html>

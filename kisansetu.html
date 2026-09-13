@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KisanSetu — the bridge between farm and table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --soil-dark:#161f14;
+    --soil-panel:#212c1c;
+    --soil-panel-2:#283523;
+    --leaf:#7fa653;
+    --leaf-bright:#a7cc78;
+    --marigold:#e3a73c;
+    --marigold-deep:#c77a2e;
+    --water:#4f86a0;
+    --water-bright:#7fb8d1;
+    --cream:#f0e6c8;
+    --cream-dim:#cfc4a3;
+    --ink:#12180f;
+    --danger:#c85c4a;
+    --radius-s:10px;
+    --radius-m:16px;
+    --radius-l:28px;
+    --serif:'Fraunces', serif;
+    --sans:'Manrope', sans-serif;
+    --ease:cubic-bezier(.22,.78,.24,1);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--soil-dark);color:var(--cream);font-family:var(--sans);overflow-x:hidden;}
+  ::selection{background:var(--marigold);color:var(--ink);}
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  input,select,textarea{font-family:inherit;}
+  h1,h2,h3,h4{font-family:var(--serif);margin:0;font-weight:600;letter-spacing:-0.01em;}
+  p{margin:0;}
+  .hidden{display:none !important;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#3a4a32;border-radius:8px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- 3D CANVAS ---------- */
+  #bg-canvas{
+    position:fixed; inset:0; width:100%; height:100%; z-index:0;
+    display:block;
+  }
+
+  /* ---------- LOADING SCREEN ---------- */
+  #loader{
+    position:fixed; inset:0; z-index:50;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at 50% 40%, rgba(22,31,20,0.35) 0%, rgba(14,19,12,0.92) 68%, #0d120a 100%);
+    transition:opacity 1s var(--ease), visibility 1s var(--ease);
+  }
+  #loader.done{opacity:0; visibility:hidden; pointer-events:none;}
+  .loader-mark{
+    font-family:var(--serif); font-size:clamp(2.4rem,7vw,4.2rem); font-weight:600;
+    color:var(--cream); letter-spacing:-0.02em; display:flex; gap:2px;
+  }
+  .loader-mark span{display:inline-block; opacity:0; transform:translateY(14px); animation:letterUp .6s var(--ease) forwards;}
+  .loader-tag{
+    margin-top:10px; font-size:.82rem; letter-spacing:.04em; color:var(--cream-dim); font-weight:500;
+  }
+  .loader-bar-wrap{
+    margin-top:38px; width:min(280px,60vw); height:6px; border-radius:6px; background:rgba(240,230,200,0.12); overflow:hidden;
+    position:relative;
+  }
+  .loader-bar{
+    height:100%; width:0%; border-radius:6px;
+    background:linear-gradient(90deg,var(--leaf),var(--marigold));
+    transition:width .18s linear;
+  }
+  .loader-pct{margin-top:12px; font-size:.75rem; color:var(--cream-dim); font-variant-numeric:tabular-nums; letter-spacing:.05em;}
+  @keyframes letterUp{to{opacity:1; transform:translateY(0);}}
+
+  /* ---------- LANDING / HERO ---------- */
+  #landing{
+    position:relative; z-index:2; min-height:100vh; opacity:0;
+    transition:opacity 1.1s var(--ease);
+  }
+  #landing.show{opacity:1;}
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:5;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:26px clamp(20px,5vw,64px); pointer-events:none;
+  }
+  .brand{font-family:var(--serif); font-size:1.25rem; font-weight:600; pointer-events:auto; display:flex; align-items:center; gap:8px;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--marigold);display:inline-block;}
+  .topbar nav{display:flex; gap:28px; font-size:.85rem; color:var(--cream-dim); pointer-events:auto;}
+  .topbar nav span{cursor:default;}
+
+  .hero-wrap{
+    min-height:100vh; display:flex; flex-direction:column; justify-content:center;
+    padding:120px clamp(20px,6vw,80px) 60px;
+  }
+  .hero-headline{max-width:760px;}
+  .hero-headline h1{font-size:clamp(2.4rem,5.6vw,4.4rem); line-height:1.04;}
+  .hero-headline h1 em{font-style:italic; color:var(--marigold);}
+  .hero-headline p{margin-top:20px; font-size:1.05rem; line-height:1.6; color:var(--cream-dim); max-width:52ch;}
+
+  .role-seam{
+    margin-top:64px; display:grid; grid-template-columns:1fr 1fr; gap:0;
+    border-radius:var(--radius-l); overflow:hidden; position:relative;
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.65);
+  }
+  .role-card{
+    position:relative; padding:38px 34px 34px; min-height:230px;
+    display:flex; flex-direction:column; justify-content:space-between;
+    transition:transform .5s var(--ease), filter .5s var(--ease);
+    isolation:isolate;
+  }
+  .role-card.farmer{ background:linear-gradient(155deg,#2d3d24,#1c2717 78%); }
+  .role-card.consumer{ background:linear-gradient(155deg,#233c48,#152530 78%); }
+  .role-card::after{
+    content:""; position:absolute; inset:0; opacity:0; transition:opacity .5s var(--ease);
+    background:radial-gradient(circle at 30% 20%, rgba(255,255,255,0.08), transparent 60%);
+    z-index:-1;
+  }
+  .role-card:hover{transform:translateY(-6px);}
+  .role-card:hover::after{opacity:1;}
+  .role-card .role-icon{font-size:2.1rem;}
+  .role-card h3{font-size:1.5rem; margin-top:16px;}
+  .role-card.farmer h3{color:var(--leaf-bright);}
+  .role-card.consumer h3{color:var(--water-bright);}
+  .role-card p.desc{margin-top:8px; font-size:.92rem; color:var(--cream-dim); line-height:1.55; max-width:34ch;}
+  .role-btn{
+    margin-top:26px; align-self:flex-start; border:none; padding:12px 22px; border-radius:999px;
+    font-weight:700; font-size:.85rem; display:inline-flex; align-items:center; gap:8px;
+    transition:transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .role-btn:hover{transform:translateX(3px);}
+  .role-btn.farmer-btn{background:var(--leaf-bright); color:#16220f;}
+  .role-btn.consumer-btn{background:var(--water-bright); color:#0c2430;}
+  .seam-badge{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:56px; height:56px; border-radius:50%; background:var(--soil-dark);
+    display:flex; align-items:center; justify-content:center; font-family:var(--serif);
+    font-size:.9rem; border:2px solid var(--marigold); color:var(--marigold); z-index:3;
+    box-shadow:0 8px 26px rgba(0,0,0,.5);
+  }
+
+  .hero-scroll-hint{margin-top:46px; font-size:.78rem; color:var(--cream-dim); display:flex; align-items:center; gap:8px;}
+  .hero-scroll-hint .line{width:26px; height:1px; background:var(--cream-dim);}
+
+  /* ---------- TOAST ---------- */
+  #toast-stack{position:fixed; bottom:26px; left:50%; transform:translateX(-50%); z-index:200; display:flex; flex-direction:column; gap:10px; align-items:center;}
+  .toast{
+    background:#20291b; border:1px solid #3a4a32; color:var(--cream); padding:12px 20px; border-radius:999px;
+    font-size:.85rem; font-weight:600; box-shadow:0 12px 30px rgba(0,0,0,.4);
+    opacity:0; transform:translateY(14px); animation:toastIn .35s var(--ease) forwards;
+    display:flex; align-items:center; gap:8px;
+  }
+  .toast.leave{animation:toastOut .3s var(--ease) forwards;}
+  @keyframes toastIn{to{opacity:1; transform:translateY(0);}}
+  @keyframes toastOut{to{opacity:0; transform:translateY(-10px);}}
+
+  /* ================= DASHBOARD SHELLS ================= */
+  .app-shell{position:fixed; inset:0; z-index:10; display:none; background:var(--soil-dark);}
+  .app-shell.active{display:flex;}
+  .app-shell{opacity:0; transition:opacity .5s var(--ease);}
+  .app-shell.active.in{opacity:1;}
+
+  .sidebar{
+    width:238px; flex-shrink:0; background:#1a2416; border-right:1px solid #2c3924;
+    display:flex; flex-direction:column; padding:26px 18px;
+  }
+  .sidebar .brand{margin-bottom:34px; padding-left:6px;}
+  .side-nav{display:flex; flex-direction:column; gap:4px;}
+  .side-nav button{
+    display:flex; align-items:center; gap:12px; background:none; border:none; color:var(--cream-dim);
+    padding:12px 14px; border-radius:12px; font-size:.9rem; font-weight:600; text-align:left; transition:background .2s, color .2s;
+  }
+  .side-nav button .ic{font-size:1.05rem;}
+  .side-nav button:hover{background:#232f1c; color:var(--cream);}
+  .side-nav button.active{background:var(--leaf); color:#132009;}
+  .sidebar-foot{margin-top:auto; display:flex; flex-direction:column; gap:10px;}
+  .role-pill{
+    font-size:.72rem; color:var(--cream-dim); border:1px solid #3a4a32; border-radius:999px; padding:6px 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .role-pill .avatar{width:22px;height:22px;border-radius:50%;background:#324226;display:flex;align-items:center;justify-content:center;font-size:.8rem;}
+  .exit-btn{
+    background:none; border:1px solid #3a4a32; color:var(--cream-dim); border-radius:12px; padding:10px 12px;
+    font-size:.8rem; font-weight:600; transition:border-color .2s, color .2s;
+  }
+  .exit-btn:hover{border-color:var(--danger); color:var(--danger);}
+
+  .main-col{flex:1; display:flex; flex-direction:column; min-width:0;}
+  .topheader{
+    padding:22px 34px; display:flex; align-items:center; justify-content:space-between; gap:20px;
+    border-bottom:1px solid #232f1c; flex-wrap:wrap;
+  }
+  .topheader h2{font-size:1.5rem;}
+  .topheader .sub{font-size:.85rem; color:var(--cream-dim); margin-top:4px;}
+  .main-scroll{flex:1; overflow-y:auto; padding:30px 34px 70px;}
+
+  .stat-row{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:16px; margin-bottom:28px;}
+  .stat-card{
+    background:var(--soil-panel); border:1px solid #2c3924; border-radius:var(--radius-m); padding:18px 20px;
+  }
+  .stat-card .label{font-size:.76rem; color:var(--cream-dim); font-weight:600;}
+  .stat-card .value{font-family:var(--serif); font-size:1.7rem; margin-top:8px;}
+  .stat-card .delta{font-size:.75rem; margin-top:6px; font-weight:700;}
+  .delta.up{color:var(--leaf-bright);}
+  .delta.down{color:var(--danger);}
+
+  .panel{background:var(--soil-panel); border:1px solid #2c3924; border-radius:var(--radius-m); padding:24px;}
+  .panel + .panel{margin-top:20px;}
+  .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:12px; flex-wrap:wrap;}
+  .panel-head h3{font-size:1.05rem;}
+
+  .btn{
+    border:none; border-radius:11px; padding:11px 18px; font-weight:700; font-size:.84rem;
+    display:inline-flex; align-items:center; gap:8px; transition:transform .18s var(--ease), filter .18s;
+  }
+  .btn:active{transform:scale(.96);}
+  .btn-primary{background:var(--leaf); color:#12200a;}
+  .btn-primary:hover{filter:brightness(1.08);}
+  .btn-ghost{background:transparent; border:1px solid #3a4a32; color:var(--cream);}
+  .btn-ghost:hover{border-color:var(--leaf-bright); color:var(--leaf-bright);}
+  .btn-danger{background:rgba(200,92,74,0.14); color:#e78d7c;}
+  .btn-danger:hover{background:rgba(200,92,74,0.26);}
+  .btn-water{background:var(--water); color:#0c2430;}
+  .btn-water:hover{filter:brightness(1.1);}
+  .btn-sm{padding:8px 13px; font-size:.76rem; border-radius:9px;}
+
+  /* product grid — farmer */
+  .product-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px;}
+  .p-card{
+    background:var(--soil-panel-2); border:1px solid #354229; border-radius:var(--radius-m); padding:18px;
+    display:flex; flex-direction:column; gap:10px; transition:transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .p-card:hover{transform:translateY(-3px); box-shadow:0 16px 34px -18px rgba(0,0,0,.6);}
+  .p-card .p-top{display:flex; justify-content:space-between; align-items:flex-start;}
+  .p-emoji{font-size:1.8rem;}
+  .p-cat{font-size:.68rem; text-transform:none; color:var(--cream-dim); background:#1c2717; padding:3px 9px; border-radius:999px;}
+  .p-name{font-size:1.05rem; font-weight:700; font-family:var(--serif);}
+  .p-row{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .p-row label{font-size:.72rem; color:var(--cream-dim); font-weight:700;}
+  .field-inline{
+    display:flex; align-items:center; background:#161f13; border:1px solid #33422a; border-radius:9px; overflow:hidden;
+  }
+  .field-inline span{padding:8px 8px 8px 10px; font-size:.8rem; color:var(--cream-dim);}
+  .field-inline input{
+    background:none; border:none; color:var(--cream); width:64px; padding:8px 10px 8px 0; font-size:.86rem; font-weight:700;
+  }
+  .field-inline input:focus{outline:none;}
+  .stock-badge{font-size:.72rem; font-weight:700; padding:5px 10px; border-radius:999px;}
+  .stock-badge.in{background:rgba(127,166,83,0.18); color:var(--leaf-bright);}
+  .stock-badge.out{background:rgba(200,92,74,0.16); color:#e78d7c;}
+  .p-actions{display:flex; gap:8px; margin-top:4px;}
+
+  .switch{position:relative; width:42px; height:24px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .switch .track{position:absolute; inset:0; background:#3a4a32; border-radius:999px; transition:background .25s;}
+  .switch .knob{position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:var(--cream); transition:transform .25s var(--ease);}
+  .switch input:checked + .track{background:var(--leaf);}
+  .switch input:checked + .track .knob{transform:translateX(18px);}
+
+  /* revenue chart */
+  .bar-chart{display:flex; align-items:flex-end; gap:10px; height:160px; padding-top:10px;}
+  .bar-col{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:8px;}
+  .bar-col .bar{
+    width:100%; max-width:34px; border-radius:8px 8px 3px 3px; background:linear-gradient(180deg,var(--leaf-bright),var(--leaf));
+    transform:scaleY(0); transform-origin:bottom; transition:transform .8s var(--ease);
+  }
+  .bar-col .bar-label{font-size:.68rem; color:var(--cream-dim);}
+  .legend-dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-right:6px;}
+
+  .list-row{display:flex; align-items:center; justify-content:space-between; padding:13px 0; border-bottom:1px solid #29351f;}
+  .list-row:last-child{border-bottom:none;}
+  .list-row .lr-left{display:flex; align-items:center; gap:12px;}
+  .lr-icon{width:36px; height:36px; border-radius:10px; background:#1c2717; display:flex; align-items:center; justify-content:center; font-size:1.1rem;}
+  .lr-name{font-weight:700; font-size:.92rem;}
+  .lr-sub{font-size:.75rem; color:var(--cream-dim); margin-top:2px;}
+
+  /* delivery */
+  .status-pills{display:flex; gap:10px; flex-wrap:wrap;}
+  .status-pill{
+    border:1.5px solid #3a4a32; background:#1a2416; padding:14px 18px; border-radius:14px; flex:1; min-width:150px;
+    display:flex; flex-direction:column; align-items:flex-start; gap:6px; transition:border-color .2s, background .2s;
+  }
+  .status-pill .sp-ic{font-size:1.3rem;}
+  .status-pill span.name{font-weight:700; font-size:.88rem;}
+  .status-pill.selected{border-color:var(--marigold); background:rgba(227,167,60,0.1);}
+  .status-dot{width:9px; height:9px; border-radius:50%; display:inline-block;}
+  .status-dot.available{background:var(--leaf-bright); box-shadow:0 0 0 4px rgba(127,166,83,0.2);}
+  .status-dot.out{background:var(--marigold); box-shadow:0 0 0 4px rgba(227,167,60,0.2);}
+  .status-dot.off{background:#6a7360;}
+  .preview-card{
+    margin-top:18px; background:#161f13; border:1px dashed #3a4a32; border-radius:14px; padding:16px 18px;
+    display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  }
+
+  input[type=text].plain, input[type=number].plain, select.plain, textarea.plain{
+    background:#161f13; border:1px solid #33422a; color:var(--cream); border-radius:10px; padding:11px 13px; font-size:.86rem; width:100%;
+  }
+  input.plain:focus, select.plain:focus, textarea.plain:focus{outline:none; border-color:var(--leaf-bright);}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .form-field label{font-size:.72rem; font-weight:700; color:var(--cream-dim); display:block; margin-bottom:6px;}
+
+  /* modal */
+  .modal-back{position:fixed; inset:0; background:rgba(10,14,8,0.6); backdrop-filter:blur(3px); z-index:60; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity .25s var(--ease);}
+  .modal-back.show{opacity:1; pointer-events:auto;}
+  .modal-box{
+    background:var(--soil-panel); border:1px solid #354229; border-radius:var(--radius-l); padding:28px; width:min(440px,90vw);
+    transform:translateY(18px) scale(.97); opacity:0; transition:transform .3s var(--ease), opacity .3s var(--ease);
+    max-height:86vh; overflow-y:auto;
+  }
+  .modal-back.show .modal-box{transform:translateY(0) scale(1); opacity:1;}
+  .modal-box h3{font-size:1.25rem; margin-bottom:18px;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:20px;}
+
+  /* ---------- CONSUMER ---------- */
+  .consumer-top{
+    padding:20px 32px; display:flex; align-items:center; gap:18px; border-bottom:1px solid #232f1c; flex-wrap:wrap;
+  }
+  .search-wrap{flex:1; min-width:220px; display:flex; align-items:center; gap:10px; background:#161f13; border:1px solid #33422a; border-radius:999px; padding:11px 18px;}
+  .search-wrap input{background:none; border:none; color:var(--cream); flex:1; font-size:.9rem;}
+  .search-wrap input:focus{outline:none;}
+  .consumer-tabs{display:flex; gap:6px;}
+  .ctab{background:none; border:1px solid #33422a; color:var(--cream-dim); padding:10px 16px; border-radius:999px; font-weight:700; font-size:.82rem; display:flex; align-items:center; gap:8px;}
+  .ctab.active{background:var(--water); color:#0c2430; border-color:transparent;}
+  .cart-fab{position:relative;}
+  .cart-count{position:absolute; top:-7px; right:-7px; background:var(--marigold); color:#241705; font-size:.65rem; font-weight:800; width:18px; height:18px; border-radius:50%; display:flex; align-items:center; justify-content:center;}
+
+  .farmer-strip{display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; margin-bottom:22px;}
+  .farmer-chip{
+    flex-shrink:0; display:flex; align-items:center; gap:10px; background:var(--soil-panel); border:1px solid #2c3924;
+    border-radius:999px; padding:8px 16px 8px 8px; font-size:.82rem; font-weight:700; transition:border-color .2s;
+  }
+  .farmer-chip.active{border-color:var(--water-bright);}
+  .farmer-chip .fc-avatar{width:28px; height:28px; border-radius:50%; background:#233c48; display:flex; align-items:center; justify-content:center;}
+
+  .cprod-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:18px;}
+  .cprod-card{
+    background:var(--soil-panel); border:1px solid #2c3924; border-radius:var(--radius-m); overflow:hidden;
+    display:flex; flex-direction:column; transition:transform .25s var(--ease), box-shadow .25s var(--ease);
+  }
+  .cprod-card:hover{transform:translateY(-4px); box-shadow:0 18px 36px -18px rgba(0,0,0,.65);}
+  .cprod-hero{height:110px; display:flex; align-items:center; justify-content:center; font-size:2.6rem; background:linear-gradient(155deg,#233c30,#1a2b22);}
+  .cprod-body{padding:16px; display:flex; flex-direction:column; gap:8px; flex:1;}
+  .cprod-farmer{font-size:.72rem; color:var(--cream-dim); display:flex; align-items:center; gap:6px;}
+  .cprod-price{font-family:var(--serif); font-size:1.25rem; margin-top:2px;}
+  .cprod-price span{font-size:.7rem; color:var(--cream-dim); font-family:var(--sans); font-weight:600;}
+  .cprod-foot{display:flex; align-items:center; justify-content:space-between; margin-top:6px; gap:8px;}
+  .qty-stepper{display:flex; align-items:center; gap:0; background:#161f13; border:1px solid #33422a; border-radius:9px;}
+  .qty-stepper button{background:none; border:none; color:var(--cream); width:28px; height:30px; font-size:1rem;}
+  .qty-stepper span{width:24px; text-align:center; font-weight:700; font-size:.85rem;}
+
+  /* drawers (cart & chat) */
+  .drawer{
+    position:fixed; top:0; right:0; height:100%; width:min(380px,92vw); background:#1a2416; border-left:1px solid #2c3924;
+    z-index:70; transform:translateX(100%); transition:transform .4s var(--ease); display:flex; flex-direction:column;
+  }
+  .drawer.open{transform:translateX(0);}
+  .drawer-head{padding:22px 22px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #2c3924;}
+  .drawer-close{background:none; border:none; color:var(--cream-dim); font-size:1.3rem;}
+  .drawer-body{flex:1; overflow-y:auto; padding:18px 22px;}
+  .drawer-foot{padding:18px 22px; border-top:1px solid #2c3924;}
+  .cart-item{display:flex; gap:12px; padding:12px 0; border-bottom:1px solid #29351f;}
+  .cart-item:last-child{border-bottom:none;}
+  .cart-item .ci-emoji{width:46px; height:46px; border-radius:10px; background:#212c1c; display:flex; align-items:center; justify-content:center; font-size:1.4rem;}
+  .cart-item .ci-name{font-weight:700; font-size:.88rem;}
+  .cart-item .ci-sub{font-size:.75rem; color:var(--cream-dim); margin-top:2px;}
+  .cart-total-row{display:flex; justify-content:space-between; font-family:var(--serif); font-size:1.2rem; margin-bottom:14px;}
+
+  .chat-msgs{display:flex; flex-direction:column; gap:10px;}
+  .msg{max-width:80%; padding:10px 14px; border-radius:14px; font-size:.86rem; line-height:1.4;}
+  .msg.me{align-self:flex-end; background:var(--water); color:#0c2430; border-bottom-right-radius:4px;}
+  .msg.them{align-self:flex-start; background:#243120; color:var(--cream); border-bottom-left-radius:4px;}
+  .msg-time{font-size:.62rem; opacity:.6; margin-top:4px;}
+  .chat-input-row{display:flex; gap:8px;}
+  .chat-input-row input{flex:1;}
+  .chat-header-info{display:flex; align-items:center; gap:10px;}
+  .empty-state{display:flex; flex-direction:column; align-items:center; text-align:center; padding:50px 20px; color:var(--cream-dim); gap:10px;}
+  .empty-state .es-ic{font-size:2.2rem;}
+
+  @media (max-width:820px){
+    .role-seam{grid-template-columns:1fr;}
+    .seam-badge{top:0; transform:translate(-50%,-50%);}
+    .app-shell.active{flex-direction:column;}
+    .sidebar{width:100%; flex-direction:row; align-items:center; padding:14px 16px; border-right:none; border-bottom:1px solid #2c3924; overflow-x:auto;}
+    .sidebar .brand{margin-bottom:0; margin-right:14px;}
+    .side-nav{flex-direction:row;}
+    .sidebar-foot{margin-top:0; margin-left:auto; flex-direction:row;}
+    .main-scroll{padding:22px 18px 60px;}
+    .topheader{padding:18px 18px;}
+    .form-grid{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001ms !important; transition-duration:.001ms !important;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<!-- ===================== LOADER ===================== -->
+<div id="loader">
+  <div class="loader-mark" id="loader-mark"></div>
+  <div class="loader-tag">the bridge between farm and table</div>
+  <div class="loader-bar-wrap"><div class="loader-bar" id="loader-bar"></div></div>
+  <div class="loader-pct" id="loader-pct">Sprouting… 0%</div>
+</div>
+
+<!-- ===================== LANDING ===================== -->
+<div id="landing">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span>KisanSetu</div>
+    <nav><span>For Farmers</span><span>For Buyers</span><span>About</span></nav>
+  </div>
+
+  <div class="hero-wrap">
+    <div class="hero-headline">
+      <h1>Where the <em>harvest</em><br/>meets the home.</h1>
+      <p>KisanSetu is a straight line from field to kitchen — farmers set their own prices and delivery windows, buyers order straight from the source. No middlemen standing on the bridge.</p>
+    </div>
+
+    <div class="role-seam">
+      <div class="role-card farmer">
+        <div>
+          <div class="role-icon">🌾</div>
+          <h3>I grow the produce</h3>
+          <p class="desc">List your crops, set your own prices, track what's selling, and tell buyers when you're out on delivery.</p>
+        </div>
+        <button class="role-btn farmer-btn" onclick="enterApp('farmer')">Continue as a Farmer</button>
+      </div>
+      <div class="role-card consumer">
+        <div>
+          <div class="role-icon">🛒</div>
+          <h3>I'm here to buy</h3>
+          <p class="desc">Search nearby farmers, fill your cart straight from the field, and chat directly with the person who grew it.</p>
+        </div>
+        <button class="role-btn consumer-btn" onclick="enterApp('consumer')">Continue as a Buyer</button>
+      </div>
+      <div class="seam-badge">सेतु</div>
+    </div>
+
+    <div class="hero-scroll-hint"><span class="line"></span> a live look, not a mockup — everything on this page actually works</div>
+  </div>
+</div>
+
+<!-- ===================== TOASTS ===================== -->
+<div id="toast-stack"></div>
+
+<!-- ===================== FARMER APP ===================== -->
+<div class="app-shell" id="farmer-app">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span>KisanSetu</div>
+    <div class="side-nav" id="farmer-nav">
+      <button data-tab="products" class="active"><span class="ic">🌱</span>Products</button>
+      <button data-tab="revenue"><span class="ic">📈</span>Revenue</button>
+      <button data-tab="stock"><span class="ic">📦</span>Sales &amp; Stock</button>
+      <button data-tab="delivery"><span class="ic">🚚</span>Delivery</button>
+    </div>
+    <div class="sidebar-foot">
+      <div class="role-pill"><span class="avatar" id="farmer-avatar-pill">🧑‍🌾</span><span id="farmer-name-pill">Ramesh Patil</span></div>
+      <button class="exit-btn" onclick="exitApp()">← Switch role</button>
+    </div>
+  </aside>
+  <div class="main-col">
+    <header class="topheader">
+      <div>
+        <h2 id="farmer-tab-title">Your products</h2>
+        <div class="sub" id="farmer-tab-sub">Add crops, tweak prices, retire what's sold out.</div>
+      </div>
+      <button class="btn btn-primary" id="add-product-btn" onclick="openProductModal()">+ Add a crop</button>
+    </header>
+    <div class="main-scroll" id="farmer-content"></div>
+  </div>
+</div>
+
+<!-- ===================== CONSUMER APP ===================== -->
+<div class="app-shell" id="consumer-app">
+  <div class="main-col" style="width:100%;">
+    <div class="topbar" style="position:relative; padding:20px 32px 0;">
+      <div class="brand"><span class="dot"></span>KisanSetu</div>
+      <button class="exit-btn" onclick="exitApp()" style="pointer-events:auto;">← Switch role</button>
+    </div>
+    <header class="consumer-top">
+      <div class="search-wrap">
+        <span>🔍</span>
+        <input type="text" id="consumer-search" placeholder="Search crops, farmers, or a village…" oninput="renderConsumerBrowse()"/>
+      </div>
+      <div class="consumer-tabs" id="consumer-tabs">
+        <button class="ctab active" data-ctab="browse">Browse</button>
+        <button class="ctab" data-ctab="orders">My Farmers</button>
+      </div>
+      <button class="btn btn-ghost cart-fab" onclick="openCart()">🛍️ Cart <span class="cart-count hidden" id="cart-count">0</span></button>
+    </header>
+    <div class="main-scroll" id="consumer-content"></div>
+  </div>
+</div>
+
+<!-- ===================== CART DRAWER ===================== -->
+<div class="drawer" id="cart-drawer">
+  <div class="drawer-head"><h3 style="font-size:1.1rem;">Your cart</h3><button class="drawer-close" onclick="closeCart()">✕</button></div>
+  <div class="drawer-body" id="cart-body"></div>
+  <div class="drawer-foot" id="cart-foot"></div>
+</div>
+
+<!-- ===================== CHAT DRAWER ===================== -->
+<div class="drawer" id="chat-drawer">
+  <div class="drawer-head">
+    <div class="chat-header-info"><span id="chat-avatar">🧑‍🌾</span><div><div style="font-weight:700; font-size:.9rem;" id="chat-name">Farmer</div><div class="lr-sub" id="chat-status">Available</div></div></div>
+    <button class="drawer-close" onclick="closeChat()">✕</button>
+  </div>
+  <div class="drawer-body"><div class="chat-msgs" id="chat-msgs"></div></div>
+  <div class="drawer-foot">
+    <div class="chat-input-row">
+      <input type="text" class="plain" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChat()"/>
+      <button class="btn btn-water btn-sm" onclick="sendChat()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== PRODUCT MODAL ===================== -->
+<div class="modal-back" id="product-modal">
+  <div class="modal-box">
+    <h3 id="modal-title">Add a crop</h3>
+    <input type="hidden" id="edit-product-id"/>
+    <div class="form-grid">
+      <div class="form-field" style="grid-column:1/-1;">
+        <label>Crop name</label>
+        <input type="text" class="plain" id="f-name" placeholder="e.g. Alphonso Mangoes"/>
+      </div>
+      <div class="form-field">
+        <label>Category</label>
+        <select class="plain" id="f-category">
+          <option>Vegetable</option><option>Fruit</option><option>Grain</option><option>Spice</option><option>Dairy</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Unit</label>
+        <select class="plain" id="f-unit"><option>kg</option><option>pc</option><option>dozen</option><option>litre</option></select>
+      </div>
+      <div class="form-field">
+        <label>Your price (₹)</label>
+        <input type="number" class="plain" id="f-price" min="0" placeholder="e.g. 40"/>
+      </div>
+      <div class="form-field">
+        <label>Cost to grow (₹)</label>
+        <input type="number" class="plain" id="f-cost" min="0" placeholder="e.g. 22"/>
+      </div>
+      <div class="form-field" style="grid-column:1/-1;">
+        <label>Stock available</label>
+        <input type="number" class="plain" id="f-stock" min="0" placeholder="e.g. 60"/>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProduct()">Save crop</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== THREE.JS ===================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =====================================================================
+   DATA LAYER — everything below is in-memory only, frontend demo state
+   ===================================================================== */
+const EMOJI = {
+  'Alphonso Mangoes':'🥭','Tomatoes':'🍅','Basmati Rice':'🌾','Turmeric':'🟠','Coconuts':'🥥',
+  'Wheat':'🌿','Mustard Greens':'🥬','Onions':'🧅','Spinach':'🥬','Sugarcane':'🎋','Green Chillies':'🌶️',
+  'Potatoes':'🥔','Bananas':'🍌','Groundnuts':'🥜'
+};
+function emojiFor(name){ return EMOJI[name] || '🌱'; }
+
+function seededSeries(seed, n, base, spread){
+  let s = seed;
+  const out = [];
+  for(let i=0;i<n;i++){ s = (s*9301+49297)%233280; const r = s/233280; out.push(Math.max(0,Math.round(base + (r-0.5)*spread))); }
+  return out;
+}
+
+const state = {
+  farmers:[
+    {id:'f1', name:'Ramesh Patil', village:'Nashik, Maharashtra', rating:4.6, delivery:'available', note:'', avatar:'🧑\u200d🌾'},
+    {id:'f2', name:'Lakshmi Devi', village:'Coimbatore, Tamil Nadu', rating:4.8, delivery:'out', note:'On the Peelamedu route, back by 6pm', avatar:'👩\u200d🌾'},
+    {id:'f3', name:'Harpreet Singh', village:'Ludhiana, Punjab', rating:4.4, delivery:'off', note:'', avatar:'🧑\u200d🌾'},
+  ],
+  currentFarmerId:'f1',
+  products:[
+    {id:'p1', farmerId:'f1', name:'Alphonso Mangoes', category:'Fruit', unit:'kg', price:180, cost:110, stock:42, sold7:seededSeries(11,7,14,10)},
+    {id:'p2', farmerId:'f1', name:'Tomatoes', category:'Vegetable', unit:'kg', price:28, cost:14, stock:0, sold7:seededSeries(22,7,30,16)},
+    {id:'p3', farmerId:'f1', name:'Basmati Rice', category:'Grain', unit:'kg', price:95, cost:62, stock:120, sold7:seededSeries(33,7,22,12)},
+    {id:'p4', farmerId:'f2', name:'Turmeric', category:'Spice', unit:'kg', price:210, cost:140, stock:30, sold7:seededSeries(44,7,9,6)},
+    {id:'p5', farmerId:'f2', name:'Coconuts', category:'Fruit', unit:'pc', price:35, cost:18, stock:200, sold7:seededSeries(55,7,40,20)},
+    {id:'p6', farmerId:'f3', name:'Wheat', category:'Grain', unit:'kg', price:32, cost:22, stock:300, sold7:seededSeries(66,7,50,18)},
+    {id:'p7', farmerId:'f3', name:'Mustard Greens', category:'Vegetable', unit:'kg', price:22, cost:11, stock:0, sold7:seededSeries(77,7,12,8)},
+  ],
+  cart:[],
+  chats:{
+    f1:[{from:'them', text:"Namaste! Ramesh here — ask me anything about today's harvest.", time:'9:02 AM'}],
+    f2:[{from:'them', text:"Hi, this is Lakshmi. I'm out delivering right now but I'll reply quick!", time:'8:40 AM'}],
+    f3:[{from:'them', text:"Harpreet here. I'm off the road today, back tomorrow morning.", time:'Yesterday'}],
+  },
+  consumerTab:'browse',
+  consumerFarmerFilter:null,
+  activeChatFarmer:null,
+};
+
+function farmerById(id){ return state.farmers.find(f=>f.id===id); }
+function myProducts(){ return state.products.filter(p=>p.farmerId===state.currentFarmerId); }
+
+/* =====================================================================
+   TOASTS
+   ===================================================================== */
+function toast(msg, icon){
+  const stack = document.getElementById('toast-stack');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = `<span>${icon||'✓'}</span><span>${msg}</span>`;
+  stack.appendChild(el);
+  setTimeout(()=>{ el.classList.add('leave'); setTimeout(()=>el.remove(),320); }, 2400);
+}
+
+/* =====================================================================
+   LOADING SCREEN
+   ===================================================================== */
+const markEl = document.getElementById('loader-mark');
+"KisanSetu".split('').forEach((ch,i)=>{
+  const s = document.createElement('span');
+  s.textContent = ch === ' ' ? '\u00A0' : ch;
+  s.style.animationDelay = (i*0.045)+'s';
+  markEl.appendChild(s);
+});
+
+let loadProgress = 0;
+const barEl = document.getElementById('loader-bar');
+const pctEl = document.getElementById('loader-pct');
+const loaderEl = document.getElementById('loader');
+const landingEl = document.getElementById('landing');
+
+function tickLoader(){
+  loadProgress += Math.random()*9 + 4;
+  if(loadProgress >= 100){
+    loadProgress = 100;
+    barEl.style.width = '100%';
+    pctEl.textContent = 'Ready — 100%';
+    setTimeout(()=>{
+      loaderEl.classList.add('done');
+      landingEl.classList.add('show');
+      pullBackCamera();
+    }, 350);
+    return;
+  }
+  barEl.style.width = loadProgress + '%';
+  pctEl.textContent = (loadProgress < 40 ? 'Sprouting… ' : loadProgress < 80 ? 'Setting up the field… ' : 'Almost there… ') + Math.floor(loadProgress) + '%';
+  setTimeout(tickLoader, 140 + Math.random()*120);
+}
+setTimeout(tickLoader, 500);
+
+/* =====================================================================
+   THREE.JS SCENE — a low-poly farmland with a bridge over water,
+   sun, drifting particles, camera pulls back after loading.
+   ===================================================================== */
+let renderer, scene, camera, clock, sprout, sceneGroup, particles, animId;
+let water, waterBaseY, cubeCamera, sunLight, frameCount = 0;
+let trees = [];
+let mouseX = 0, mouseY = 0;
+const SUN_DIR = new THREE.Vector3(0.35, 0.55, 0.25).normalize();
+
+/* ---- procedural textures (no external images, so nothing to fetch) ---- */
+function makeCanvasTexture(size, painter){
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  painter(c.getContext('2d'), size);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+function makeGrassTexture(){
+  return makeCanvasTexture(256, (ctx,s)=>{
+    const g = ctx.createLinearGradient(0,0,0,s);
+    g.addColorStop(0,'#5f9a3c'); g.addColorStop(1,'#3f7526');
+    ctx.fillStyle = g; ctx.fillRect(0,0,s,s);
+    for(let i=0;i<2800;i++){
+      const x = Math.random()*s, y = Math.random()*s, l = 2+Math.random()*5;
+      ctx.strokeStyle = Math.random()<0.5 ? 'rgba(160,210,95,0.5)' : 'rgba(20,42,10,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+(Math.random()-0.5)*2, y-l); ctx.stroke();
+    }
+  });
+}
+function makeDirtTexture(){
+  return makeCanvasTexture(128, (ctx,s)=>{
+    ctx.fillStyle = '#8a6338'; ctx.fillRect(0,0,s,s);
+    for(let i=0;i<900;i++){
+      const x = Math.random()*s, y = Math.random()*s, r = 0.6+Math.random()*1.8;
+      ctx.fillStyle = Math.random()<0.5 ? 'rgba(60,42,22,0.5)' : 'rgba(160,120,75,0.4)';
+      ctx.beginPath(); ctx.ellipse(x,y,r,r*0.7,0,0,Math.PI*2); ctx.fill();
+    }
+  });
+}
+function makeBarkTextures(){
+  const size = 128;
+  const dCanvas = document.createElement('canvas'); dCanvas.width = dCanvas.height = size;
+  const bCanvas = document.createElement('canvas'); bCanvas.width = bCanvas.height = size;
+  const dctx = dCanvas.getContext('2d'), bctx = bCanvas.getContext('2d');
+  dctx.fillStyle = '#4a3620'; dctx.fillRect(0,0,size,size);
+  bctx.fillStyle = '#7d7d7d'; bctx.fillRect(0,0,size,size);
+  for(let i=0;i<260;i++){
+    const x = Math.random()*size, wobble = (Math.random()-0.5)*10, w = 1+Math.random()*2.4;
+    const dark = Math.random()<0.55;
+    dctx.strokeStyle = dark ? 'rgba(28,18,10,0.55)' : 'rgba(118,88,54,0.5)';
+    dctx.lineWidth = w;
+    dctx.beginPath(); dctx.moveTo(x,0); dctx.lineTo(x+wobble,size); dctx.stroke();
+    const g = dark ? 30+Math.random()*30 : 170+Math.random()*40;
+    bctx.strokeStyle = `rgba(${g|0},${g|0},${g|0},0.6)`;
+    bctx.lineWidth = w;
+    bctx.beginPath(); bctx.moveTo(x,0); bctx.lineTo(x+wobble,size); bctx.stroke();
+  }
+  const diffuse = new THREE.CanvasTexture(dCanvas); diffuse.wrapS = diffuse.wrapT = THREE.RepeatWrapping;
+  const bump = new THREE.CanvasTexture(bCanvas); bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
+  return { diffuse, bump };
+}
+function makeLeafClumpTexture(){
+  const size = 128;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  for(let i=0;i<16;i++){
+    const ang = Math.random()*Math.PI*2, rad = Math.random()*26;
+    const x = 64+Math.cos(ang)*rad, y = 64+Math.sin(ang)*rad, r = 14+Math.random()*22;
+    const shade = Math.random();
+    let color;
+    if(shade<0.3) color = `rgba(34,58,20,0.9)`;
+    else if(shade<0.72) color = `rgba(64,${104+Math.random()*36|0},38,0.88)`;
+    else color = `rgba(120,${142+Math.random()*30|0},58,0.85)`;
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalCompositeOperation = 'destination-in';
+  const mask = ctx.createRadialGradient(64,64,8,64,64,58);
+  mask.addColorStop(0,'rgba(255,255,255,1)');
+  mask.addColorStop(0.75,'rgba(255,255,255,0.9)');
+  mask.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle = mask; ctx.fillRect(0,0,size,size);
+  ctx.globalCompositeOperation = 'source-over';
+  return new THREE.CanvasTexture(c);
+}
+function makeSingleLeafTexture(){
+  const size = 128;
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const ctx = c.getContext('2d');
+  ctx.beginPath();
+  ctx.moveTo(64,8);
+  ctx.bezierCurveTo(102,28,112,74,64,122);
+  ctx.bezierCurveTo(16,74,26,28,64,8);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(64,8,64,122);
+  grad.addColorStop(0,'#a3dd6e'); grad.addColorStop(0.55,'#6fae42'); grad.addColorStop(1,'#3c7228');
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(64,12); ctx.lineTo(64,118); ctx.stroke();
+  for(let i=0;i<5;i++){
+    const y = 26+i*17;
+    ctx.beginPath(); ctx.moveTo(64,y); ctx.lineTo(64+20,y+15); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(64,y); ctx.lineTo(64-20,y+15); ctx.stroke();
+  }
+  ctx.restore();
+  return new THREE.CanvasTexture(c);
+}
+function makeCloudSprite(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,4,64,64,62);
+  g.addColorStop(0,'rgba(255,250,240,0.9)');
+  g.addColorStop(0.5,'rgba(255,250,240,0.45)');
+  g.addColorStop(1,'rgba(255,250,240,0)');
+  ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+function makeGlowSprite(rgba){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,0,64,64,64);
+  g.addColorStop(0, rgba);
+  g.addColorStop(0.4, rgba.replace(/[\d.]+\)$/, '0.35)'));
+  g.addColorStop(1, rgba.replace(/[\d.]+\)$/, '0)'));
+  ctx.fillStyle = g; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+
+function initThree(){
+  const canvas = document.getElementById('bg-canvas');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0xf4c98a, 1);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  if(THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0xcdc190, 0.016);
+
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 120);
+  camera.position.set(0, 1.6, 3.2);
+  camera.lookAt(0,0.6,0);
+
+  /* ---- sky dome: warm golden-hour gradient with a soft sun glow baked in ---- */
+  const skyMat = new THREE.ShaderMaterial({
+    uniforms:{
+      topColor:{value:new THREE.Color(0x2c5a63)},
+      bottomColor:{value:new THREE.Color(0xf6cf95)},
+      sunDirection:{value:SUN_DIR},
+      sunColor:{value:new THREE.Color(0xfff1c9)},
+    },
+    vertexShader:`varying vec3 vPos; void main(){ vPos = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader:`
+      uniform vec3 topColor; uniform vec3 bottomColor; uniform vec3 sunDirection; uniform vec3 sunColor;
+      varying vec3 vPos;
+      void main(){
+        float h = clamp(vPos.y*0.65+0.45, 0.0, 1.0);
+        vec3 sky = mix(bottomColor, topColor, h);
+        float sunAmount = max(dot(vPos, normalize(sunDirection)), 0.0);
+        sky += sunColor * pow(sunAmount, 340.0) * 3.0;
+        sky += sunColor * pow(sunAmount, 8.0) * 0.35;
+        gl_FragColor = vec4(sky, 1.0);
+      }`,
+    side: THREE.BackSide, depthWrite:false, fog:false,
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(90, 24, 16), skyMat);
+  scene.add(sky);
+
+  /* soft billboard clouds */
+  const cloudTex = makeCloudSprite();
+  for(let i=0;i<9;i++){
+    const mat = new THREE.SpriteMaterial({ map:cloudTex, transparent:true, opacity:0.5+Math.random()*0.3, depthWrite:false });
+    const spr = new THREE.Sprite(mat);
+    const s = 4+Math.random()*5;
+    spr.scale.set(s, s*0.5, 1);
+    spr.position.set((Math.random()-0.5)*50, 8+Math.random()*7, -20-Math.random()*30);
+    scene.add(spr);
+  }
+
+  /* sun sprite (matches the directional light's direction) */
+  const sunPos = SUN_DIR.clone().multiplyScalar(60);
+  const sunCore = new THREE.Sprite(new THREE.SpriteMaterial({ map:makeGlowSprite('rgba(255,244,214,1)'), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+  sunCore.scale.set(6,6,1); sunCore.position.copy(sunPos);
+  scene.add(sunCore);
+  const sunHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map:makeGlowSprite('rgba(255,220,150,0.9)'), transparent:true, blending:THREE.AdditiveBlending, depthWrite:false }));
+  sunHalo.scale.set(16,16,1); sunHalo.position.copy(sunPos);
+  scene.add(sunHalo);
+
+  /* lighting */
+  const hemi = new THREE.HemisphereLight(0xdfe3b0, 0x1f3016, 0.85);
+  scene.add(hemi);
+  sunLight = new THREE.DirectionalLight(0xffdca0, 2.0);
+  sunLight.position.copy(SUN_DIR.clone().multiplyScalar(18));
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048,2048);
+  sunLight.shadow.camera.left = -16; sunLight.shadow.camera.right = 16;
+  sunLight.shadow.camera.top = 14; sunLight.shadow.camera.bottom = -10;
+  sunLight.shadow.camera.near = 1; sunLight.shadow.camera.far = 45;
+  sunLight.shadow.bias = -0.0015;
+  scene.add(sunLight);
+  const fill = new THREE.DirectionalLight(0x9fc6d8, 0.35);
+  fill.position.set(-6,4,6);
+  scene.add(fill);
+
+  sceneGroup = new THREE.Group();
+  scene.add(sceneGroup);
+
+  const grassTex = makeGrassTexture(); grassTex.repeat.set(16,12);
+  const dirtTex = makeDirtTexture(); dirtTex.repeat.set(3,10);
+  const bark = makeBarkTextures();
+  const leafTex = makeLeafClumpTexture();
+
+  /* ---- ground: rolling farmland (left) with a dirt path leading to the bridge ---- */
+  const groundGeo = new THREE.PlaneGeometry(34, 22, 60, 40);
+  const posAttr = groundGeo.attributes.position;
+  for(let i=0;i<posAttr.count;i++){
+    const x = posAttr.getX(i), y = posAttr.getY(i);
+    const h = Math.sin(x*0.28)*0.4 + Math.cos(y*0.42)*0.3 + Math.sin((x+y)*0.13)*0.45 + Math.sin(x*1.3)*0.05;
+    posAttr.setZ(i, h - 1.2);
+  }
+  groundGeo.computeVertexNormals();
+  const groundMat = new THREE.MeshStandardMaterial({ map:grassTex, color:0xa1d99b, flatShading:true, roughness:1 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2.15;
+  ground.position.set(-3.5,-1.4,-4);
+  ground.receiveShadow = true;
+  sceneGroup.add(ground);
+
+  const pathGeo = new THREE.PlaneGeometry(1.5, 14, 4, 20);
+  const pathMat = new THREE.MeshStandardMaterial({ map:dirtTex, roughness:1 });
+  const path = new THREE.Mesh(pathGeo, pathMat);
+  path.rotation.x = -Math.PI/2;
+  path.position.set(0.6,-1.32,-4);
+  path.receiveShadow = true;
+  sceneGroup.add(path);
+
+  /* ---- reflective water on the buyer / consumer side ---- */
+  waterBaseY = -1.55;
+  const cubeRT = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps:true, minFilter:THREE.LinearMipmapLinearFilter });
+  cubeCamera = new THREE.CubeCamera(0.5, 60, cubeRT);
+  cubeCamera.position.set(4.6, waterBaseY + 0.05, -4);
+  sceneGroup.add(cubeCamera);
+
+  const waterGeo = new THREE.PlaneGeometry(7, 20, 30, 30);
+  const waterMat = new THREE.MeshPhysicalMaterial({
+    color:0x1c6fa8, roughness:0.16, metalness:0.12,
+    envMap:cubeRT.texture, envMapIntensity:0.5,
+    clearcoat:0.55, clearcoatRoughness:0.2,
+    transparent:true, opacity:0.9,
+  });
+  water = new THREE.Mesh(waterGeo, waterMat);
+  water.rotation.x = -Math.PI/2;
+  water.position.set(4.6, waterBaseY, -4);
+  water.receiveShadow = true;
+  sceneGroup.add(water);
+
+  /* ---- bridge (setu) crossing the seam, with a wood-grain texture ---- */
+  const bridgeMat = new THREE.MeshStandardMaterial({ map:bark.diffuse, bumpMap:bark.bump, bumpScale:0.5, color:0xd79a52, flatShading:true, roughness:0.9 });
+  for(let i=-3;i<=3;i++){
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.08,0.5), bridgeMat);
+    plank.position.set(1.7, -1.05 + Math.sin(i*0.5)*0.12, -3.3 + i*0.55);
+    plank.castShadow = true; plank.receiveShadow = true;
+    sceneGroup.add(plank);
+  }
+  const railGeo = new THREE.CylinderGeometry(0.03,0.03,4,6);
+  const railMat = new THREE.MeshStandardMaterial({ color:0x8a5a26, roughness:0.85 });
+  [-0.28,0.28].forEach(off=>{
+    const rail = new THREE.Mesh(railGeo, railMat);
+    rail.rotation.x = Math.PI/2;
+    rail.position.set(1.7+off, -0.72, -3.3);
+    rail.castShadow = true;
+    sceneGroup.add(rail);
+  });
+  for(let i=-3;i<=3;i++){
+    [-0.28,0.28].forEach(off=>{
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.4,6), railMat);
+      post.position.set(1.7+off, -0.92, -3.3+i*0.55);
+      post.castShadow = true;
+      sceneGroup.add(post);
+    });
+  }
+
+  /* ---- dark green grass tufts scattered across the field ---- */
+  const bladeGeo = new THREE.ConeGeometry(0.05, 0.4, 5);
+  bladeGeo.translate(0,0.2,0);
+  const bladeMatA = new THREE.MeshStandardMaterial({ color:0x274a1a, flatShading:true, roughness:0.95 });
+  const bladeMatB = new THREE.MeshStandardMaterial({ color:0x3a5f28, flatShading:true, roughness:0.95 });
+  [bladeMatA, bladeMatB].forEach((mat, group)=>{
+    const count = 480;
+    const mesh = new THREE.InstancedMesh(bladeGeo, mat, count);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    const dummy = new THREE.Object3D();
+    for(let i=0;i<count;i++){
+      const x = -13 + Math.random()*11;
+      const z = -2 - Math.random()*8;
+      const groundY = -1.75 + Math.sin(x*0.28)*0.3 + Math.cos(z*0.42)*0.2;
+      dummy.position.set(x, groundY + (group*0.02), z);
+      dummy.rotation.y = Math.random()*Math.PI;
+      dummy.rotation.z = (Math.random()-0.5)*0.3;
+      const s = 0.6+Math.random()*0.6;
+      dummy.scale.set(s*0.4, s*1.3, s*0.4);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    sceneGroup.add(mesh);
+  });
+
+  /* ---- realistic-ish trees: tapered branching trunks + soft leaf-clump sprites ---- */
+  const trunkMat = new THREE.MeshStandardMaterial({ map:bark.diffuse, bumpMap:bark.bump, bumpScale:0.7, roughness:1, color:0x8a7458 });
+  const leafMatVariants = [0x5c7a3c, 0x6f8f46, 0x486b34, 0x7a9a52].map(c=>
+    new THREE.SpriteMaterial({ map:leafTex, color:c, transparent:true, depthWrite:false, opacity:0.95 })
+  );
+
+  function addBranchSegment(group, from, dir, length, r0, r1){
+    const to = from.clone().add(dir.clone().multiplyScalar(length));
+    const mid = from.clone().lerp(to, 0.5);
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, length, 6, 1), trunkMat);
+    seg.position.copy(mid);
+    seg.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+    seg.castShadow = true; seg.receiveShadow = true;
+    group.add(seg);
+    return to;
+  }
+
+  function addLeafCluster(group, pos, size){
+    const n = 5+Math.floor(Math.random()*4);
+    for(let i=0;i<n;i++){
+      const mat = leafMatVariants[Math.floor(Math.random()*leafMatVariants.length)];
+      const spr = new THREE.Sprite(mat);
+      const s = size*(0.7+Math.random()*0.6);
+      spr.scale.set(s,s,1);
+      spr.position.set(
+        pos.x + (Math.random()-0.5)*size*1.1,
+        pos.y + (Math.random()-0.5)*size*0.9 + size*0.25,
+        pos.z + (Math.random()-0.5)*size*1.1
+      );
+      group.add(spr);
+    }
+  }
+
+  function growBranch(group, start, dir, length, r0, depth, leafSize){
+    let pos = start.clone();
+    let d = dir.clone().normalize();
+    let len = length;
+    let rad = r0;
+    const segs = 3+Math.floor(Math.random()*2);
+    for(let i=0;i<segs;i++){
+      d.x += (Math.random()-0.5)*0.3;
+      d.z += (Math.random()-0.5)*0.3;
+      d.y += 0.09;
+      d.normalize();
+      const nextRad = rad*0.7;
+      pos = addBranchSegment(group, pos, d, len, rad, nextRad);
+      rad = nextRad;
+      len *= 0.83;
+    }
+    if(depth>0){
+      const nBranches = 2+Math.floor(Math.random()*2);
+      for(let b=0;b<nBranches;b++){
+        const nd = d.clone();
+        nd.x += (Math.random()-0.5)*1.3;
+        nd.z += (Math.random()-0.5)*1.3;
+        nd.y += Math.random()*0.5;
+        growBranch(group, pos, nd, len*0.88, rad*0.85, depth-1, leafSize);
+      }
+    } else {
+      addLeafCluster(group, pos, leafSize);
+    }
+  }
+
+  trees = [];
+  function makeTree(x,z,scale,leafSize){
+    const groundY = -1.75 + Math.sin(x*0.28)*0.3 + Math.cos(z*0.42)*0.2;
+    const grp = new THREE.Group();
+    growBranch(grp, new THREE.Vector3(0,0,0), new THREE.Vector3(0,1,0).add(new THREE.Vector3((Math.random()-0.5)*0.3,0,(Math.random()-0.5)*0.3)), 0.85, 0.11, 2, leafSize);
+    grp.position.set(x, groundY, z);
+    grp.scale.set(scale,scale,scale);
+    sceneGroup.add(grp);
+    trees.push(grp);
+  }
+  makeTree(-1.1, -1.6, 1.1, 0.62);
+  makeTree(-2.6, -6.2, 0.92, 0.58);
+  makeTree(-9.5, -3.4, 1.25, 0.68);
+  makeTree(-6.2, -1.3, 1.0, 0.6);
+
+  /* ---- scattered field stones ---- */
+  const stoneMat = new THREE.MeshStandardMaterial({ color:0x8a8a80, flatShading:true, roughness:1 });
+  const stoneGeo = new THREE.IcosahedronGeometry(0.09,0);
+  const stones = new THREE.InstancedMesh(stoneGeo, stoneMat, 16);
+  stones.castShadow = true; stones.receiveShadow = true;
+  const sd = new THREE.Object3D();
+  for(let i=0;i<16;i++){
+    const x = -12+Math.random()*13, z = -1-Math.random()*9;
+    const groundY = -1.75 + Math.sin(x*0.28)*0.3 + Math.cos(z*0.42)*0.2;
+    sd.position.set(x, groundY, z);
+    sd.rotation.set(Math.random(),Math.random(),Math.random());
+    const s = 0.6+Math.random()*0.8; sd.scale.set(s,s,s);
+    sd.updateMatrix();
+    stones.setMatrixAt(i, sd.matrix);
+  }
+  sceneGroup.add(stones);
+
+  /* floating particles (pollen / dust) */
+  const pCount = 200;
+  const pGeo = new THREE.BufferGeometry();
+  const pPos = new Float32Array(pCount*3);
+  for(let i=0;i<pCount;i++){
+    pPos[i*3] = (Math.random()-0.5)*20;
+    pPos[i*3+1] = Math.random()*5 - 1;
+    pPos[i*3+2] = (Math.random()-0.5)*20 - 4;
+  }
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos,3));
+  const pMat = new THREE.PointsMaterial({ color:0xf5edd6, size:0.03, transparent:true, opacity:0.6 });
+  particles = new THREE.Points(pGeo, pMat);
+  sceneGroup.add(particles);
+
+  /* loading seedling, shown close-up while the loader is active */
+  const potMat = new THREE.MeshStandardMaterial({ color:0xc06a35, roughness:0.85 });
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.30,0.22,0.32,14), potMat);
+  pot.position.set(0,-0.55,-0.4);
+  pot.castShadow = true;
+  sceneGroup.add(pot);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.30,0.018,8,20), new THREE.MeshStandardMaterial({color:0xa8562a, roughness:0.8}));
+  rim.rotation.x = Math.PI/2; rim.position.set(0,-0.39,-0.4);
+  sceneGroup.add(rim);
+  const soil = new THREE.Mesh(new THREE.CircleGeometry(0.27,20), new THREE.MeshStandardMaterial({color:0x261b12, roughness:1}));
+  soil.rotation.x = -Math.PI/2; soil.position.set(0,-0.388,-0.4);
+  sceneGroup.add(soil);
+
+  const seedlingLeafTex = makeSingleLeafTexture();
+  const seedlingLeafMat = new THREE.MeshStandardMaterial({ map:seedlingLeafTex, transparent:true, side:THREE.DoubleSide, roughness:0.5 });
+  const seedlingStemMat = new THREE.MeshStandardMaterial({ color:0x4f7a34, roughness:0.6 });
+
+  sprout = new THREE.Group();
+  const seg1 = new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.028,0.3,6), seedlingStemMat);
+  seg1.position.set(0,0.15,0); seg1.rotation.z = 0.06;
+  const seg2 = new THREE.Mesh(new THREE.CylinderGeometry(0.014,0.02,0.26,6), seedlingStemMat);
+  seg2.position.set(0.018,0.42,0); seg2.rotation.z = -0.14;
+  sprout.add(seg1, seg2);
+  const leafGeo = new THREE.PlaneGeometry(0.22,0.3);
+  [
+    { pos:[0.1,0.53,0.015], rot:[0.25,0.55,-0.5] },
+    { pos:[-0.08,0.5,-0.015], rot:[0.2,-0.6,0.5] },
+    { pos:[0.02,0.66,0.01], rot:[0.15,0.15,0.1], scale:0.6 },
+  ].forEach(l=>{
+    const leaf = new THREE.Mesh(leafGeo, seedlingLeafMat);
+    leaf.position.set(l.pos[0], l.pos[1], l.pos[2]);
+    leaf.rotation.set(l.rot[0], l.rot[1], l.rot[2]);
+    if(l.scale) leaf.scale.set(l.scale,l.scale,l.scale);
+    leaf.castShadow = true;
+    sprout.add(leaf);
+  });
+  sprout.position.set(0,-0.39,-0.4);
+  sprout.scale.set(0.05,0.05,0.05);
+  sceneGroup.add(sprout);
+
+  clock = new THREE.Clock();
+  window.addEventListener('resize', onResize);
+  window.addEventListener('mousemove', (e)=>{
+    mouseX = (e.clientX/window.innerWidth - 0.5);
+    mouseY = (e.clientY/window.innerHeight - 0.5);
+  });
+  animate();
+}
+
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+let pulledBack = false;
+let idleActive = true;
+function pullBackCamera(){
+  pulledBack = true;
+}
+
+function animate(){
+  animId = requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  if(!pulledBack){
+    // grow sprout while loading
+    const s = 0.05 + (loadProgress/100)*0.95;
+    sprout.scale.set(s,s,s);
+    camera.position.set(0 + Math.sin(t*0.4)*0.06, -0.05, 0.55);
+    camera.lookAt(0,-0.15,-0.4);
+  } else {
+    // smoothly move camera to the wide establishing shot
+    camera.position.x += (0 + Math.sin(t*0.12)*1.4 + mouseX*0.6 - camera.position.x)*0.03;
+    camera.position.y += (1.5 - camera.position.y)*0.02;
+    camera.position.z += (5.4 - camera.position.z)*0.02;
+    camera.lookAt(0.4, 0.1, -4);
+    sprout.scale.set(1,1,1);
+  }
+
+  if(particles){
+    const posAttr = particles.geometry.attributes.position;
+    for(let i=0;i<posAttr.count;i++){
+      posAttr.setY(i, posAttr.getY(i) + Math.sin(t*0.5+i)*0.0007 + 0.0009);
+      if(posAttr.getY(i) > 4) posAttr.setY(i, -1.5);
+    }
+    posAttr.needsUpdate = true;
+    particles.rotation.y = t*0.01;
+  }
+
+  if(trees && trees.length){
+    trees.forEach((tr,i)=>{ tr.rotation.z = Math.sin(t*0.55+i*1.7)*0.012; tr.rotation.x = Math.cos(t*0.4+i)*0.008; });
+  }
+
+  if(water){
+    const wPos = water.geometry.attributes.position;
+    for(let i=0;i<wPos.count;i++){
+      const x = wPos.getX(i), y = wPos.getY(i);
+      wPos.setZ(i, Math.sin(x*1.2+t*0.8)*0.025 + Math.cos(y*0.8+t*0.6)*0.02);
+    }
+    wPos.needsUpdate = true;
+    water.geometry.computeVertexNormals();
+
+    frameCount++;
+    if(cubeCamera && frameCount % 3 === 0){
+      water.visible = false;
+      cubeCamera.update(renderer, scene);
+      water.visible = true;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+initThree();
+
+function pauseThree(){ document.getElementById('bg-canvas').style.opacity = 0; document.getElementById('bg-canvas').style.transition='opacity .6s ease'; }
+function resumeThree(){ document.getElementById('bg-canvas').style.opacity = 1; }
+
+/* =====================================================================
+   APP SHELL SWITCHING
+   ===================================================================== */
+function enterApp(role){
+  landingEl.classList.remove('show');
+  setTimeout(()=>{
+    if(role==='farmer'){
+      document.getElementById('farmer-app').classList.add('active');
+      requestAnimationFrame(()=>document.getElementById('farmer-app').classList.add('in'));
+      renderFarmerTab('products');
+    } else {
+      document.getElementById('consumer-app').classList.add('active');
+      requestAnimationFrame(()=>document.getElementById('consumer-app').classList.add('in'));
+      renderConsumerBrowse();
+    }
+    pauseThree();
+  }, 350);
+}
+function exitApp(){
+  ['farmer-app','consumer-app'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.classList.remove('in');
+    setTimeout(()=>el.classList.remove('active'), 400);
+  });
+  closeCart(); closeChat();
+  resumeThree();
+  setTimeout(()=>landingEl.classList.add('show'), 200);
+}
+
+/* =====================================================================
+   FARMER DASHBOARD
+   ===================================================================== */
+const farmerTabTitles = {
+  products:['Your products','Add crops, tweak prices, retire what\u2019s sold out.'],
+  revenue:['Revenue & margins','What you\u2019re actually taking home this week.'],
+  stock:['Sales & stock','Mark what\u2019s in stock and watch it as buyers see it.'],
+  delivery:['Delivery status','Tell buyers when you\u2019re out on the road.'],
+};
+document.getElementById('farmer-nav').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  document.querySelectorAll('#farmer-nav button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFarmerTab(btn.dataset.tab);
+});
+
+let currentFarmerTab = 'products';
+function renderFarmerTab(tab){
+  currentFarmerTab = tab;
+  document.getElementById('farmer-tab-title').textContent = farmerTabTitles[tab][0];
+  document.getElementById('farmer-tab-sub').textContent = farmerTabTitles[tab][1];
+  document.getElementById('add-product-btn').classList.toggle('hidden', tab!=='products');
+  const c = document.getElementById('farmer-content');
+  if(tab==='products') c.innerHTML = productsTabHTML();
+  if(tab==='revenue') c.innerHTML = revenueTabHTML();
+  if(tab==='stock') c.innerHTML = stockTabHTML();
+  if(tab==='delivery') c.innerHTML = deliveryTabHTML();
+  if(tab==='revenue') requestAnimationFrame(animateBars);
+}
+
+function productsTabHTML(){
+  const mine = myProducts();
+  if(mine.length===0) return `<div class="empty-state"><div class="es-ic">🌱</div><h3>No crops listed yet</h3><p>Add your first crop to start selling on KisanSetu.</p></div>`;
+  return `<div class="product-grid">${mine.map(p=>`
+    <div class="p-card">
+      <div class="p-top">
+        <div class="p-emoji">${emojiFor(p.name)}</div>
+        <span class="p-cat">${p.category}</span>
+      </div>
+      <div class="p-name">${p.name}</div>
+      <div class="p-row">
+        <label>Price / ${p.unit}</label>
+        <div class="field-inline"><span>₹</span><input type="number" value="${p.price}" min="0" onchange="updateProduct('${p.id}','price',this.value)"/></div>
+      </div>
+      <div class="p-row">
+        <label>Stock</label>
+        <div class="field-inline"><input type="number" value="${p.stock}" min="0" onchange="updateProduct('${p.id}','stock',this.value)" style="width:56px;"/><span>${p.unit}</span></div>
+      </div>
+      <div class="p-row">
+        <span class="stock-badge ${p.stock>0?'in':'out'}">${p.stock>0?'In stock':'Out of stock'}</span>
+        <span class="lr-sub">margin ₹${p.price-p.cost}</span>
+      </div>
+      <div class="p-actions">
+        <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="openProductModal('${p.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" style="flex:1;" onclick="deleteProduct('${p.id}')">Delete</button>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function updateProduct(id, field, value){
+  const p = state.products.find(p=>p.id===id);
+  if(!p) return;
+  p[field] = Math.max(0, parseFloat(value)||0);
+  toast(`${p.name} ${field} updated`, '✏️');
+  if(currentFarmerTab==='stock') renderFarmerTab('stock');
+}
+function deleteProduct(id){
+  const p = state.products.find(p=>p.id===id);
+  if(!confirm(`Remove ${p.name} from your listings?`)) return;
+  state.products = state.products.filter(x=>x.id!==id);
+  toast(`${p.name} removed`, '🗑️');
+  renderFarmerTab('products');
+}
+
+function openProductModal(id){
+  const modal = document.getElementById('product-modal');
+  document.getElementById('edit-product-id').value = id||'';
+  if(id){
+    const p = state.products.find(p=>p.id===id);
+    document.getElementById('modal-title').textContent = 'Edit crop';
+    document.getElementById('f-name').value = p.name;
+    document.getElementById('f-category').value = p.category;
+    document.getElementById('f-unit').value = p.unit;
+    document.getElementById('f-price').value = p.price;
+    document.getElementById('f-cost').value = p.cost;
+    document.getElementById('f-stock').value = p.stock;
+  } else {
+    document.getElementById('modal-title').textContent = 'Add a crop';
+    ['f-name','f-price','f-cost','f-stock'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('f-category').value = 'Vegetable';
+    document.getElementById('f-unit').value = 'kg';
+  }
+  modal.classList.add('show');
+}
+function closeProductModal(){ document.getElementById('product-modal').classList.remove('show'); }
+function saveProduct(){
+  const id = document.getElementById('edit-product-id').value;
+  const name = document.getElementById('f-name').value.trim();
+  if(!name){ toast('Give your crop a name first', '⚠️'); return; }
+  const data = {
+    name,
+    category: document.getElementById('f-category').value,
+    unit: document.getElementById('f-unit').value,
+    price: parseFloat(document.getElementById('f-price').value)||0,
+    cost: parseFloat(document.getElementById('f-cost').value)||0,
+    stock: parseInt(document.getElementById('f-stock').value)||0,
+  };
+  if(id){
+    Object.assign(state.products.find(p=>p.id===id), data);
+    toast(`${name} updated`, '✅');
+  } else {
+    state.products.push({ id:'p'+Date.now(), farmerId: state.currentFarmerId, sold7: seededSeries(Date.now()%1000,7,10,8), ...data });
+    toast(`${name} added to your listings`, '🌱');
+  }
+  closeProductModal();
+  renderFarmerTab('products');
+}
+
+function revenueTabHTML(){
+  const mine = myProducts();
+  const revenue = mine.reduce((s,p)=>s+p.sold7.reduce((a,b)=>a+b,0)*p.price,0);
+  const cost = mine.reduce((s,p)=>s+p.sold7.reduce((a,b)=>a+b,0)*p.cost,0);
+  const profit = revenue - cost;
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const dayTotals = days.map((_,i)=>mine.reduce((s,p)=>s+(p.sold7[i]||0)*p.price,0));
+  const maxDay = Math.max(...dayTotals,1);
+  return `
+  <div class="stat-row">
+    <div class="stat-card"><div class="label">Revenue (7 days)</div><div class="value">₹${revenue.toLocaleString('en-IN')}</div><div class="delta up">▲ from sales logged</div></div>
+    <div class="stat-card"><div class="label">Cost of goods</div><div class="value">₹${cost.toLocaleString('en-IN')}</div><div class="delta down">growing + harvest cost</div></div>
+    <div class="stat-card"><div class="label">Net profit</div><div class="value">₹${profit.toLocaleString('en-IN')}</div><div class="delta up">${revenue?Math.round(profit/revenue*100):0}% margin</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Revenue by day</h3><span class="lr-sub"><span class="legend-dot" style="background:var(--leaf-bright);"></span>this week</span></div>
+    <div class="bar-chart" id="bar-chart">
+      ${dayTotals.map((v,i)=>`<div class="bar-col"><div class="bar" data-h="${Math.max(6,(v/maxDay)*100)}" style="height:${Math.max(6,(v/maxDay)*100)}%;"></div><div class="bar-label">${days[i]}</div></div>`).join('')}
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Per-crop margin</h3></div>
+    ${mine.map(p=>`<div class="list-row"><div class="lr-left"><div class="lr-icon">${emojiFor(p.name)}</div><div><div class="lr-name">${p.name}</div><div class="lr-sub">${p.sold7.reduce((a,b)=>a+b,0)} ${p.unit} sold this week</div></div></div><div style="text-align:right;"><div class="lr-name">₹${((p.price-p.cost)*p.sold7.reduce((a,b)=>a+b,0)).toLocaleString('en-IN')}</div><div class="lr-sub">₹${p.price-p.cost} margin / ${p.unit}</div></div></div>`).join('')}
+  </div>`;
+}
+function animateBars(){
+  document.querySelectorAll('#bar-chart .bar').forEach(el=>{
+    const h = el.dataset.h;
+    el.style.transform = 'scaleY(0)';
+    el.style.height = h+'%';
+    requestAnimationFrame(()=>{ el.style.transform = 'scaleY(1)'; });
+  });
+}
+
+function stockTabHTML(){
+  const mine = myProducts();
+  const inStock = mine.filter(p=>p.stock>0).length;
+  const outOfStock = mine.length - inStock;
+  const low = mine.filter(p=>p.stock>0 && p.stock<10).length;
+  return `
+  <div class="stat-row">
+    <div class="stat-card"><div class="label">Total crops</div><div class="value">${mine.length}</div></div>
+    <div class="stat-card"><div class="label">In stock</div><div class="value" style="color:var(--leaf-bright);">${inStock}</div></div>
+    <div class="stat-card"><div class="label">Out of stock</div><div class="value" style="color:#e78d7c;">${outOfStock}</div></div>
+    <div class="stat-card"><div class="label">Running low</div><div class="value" style="color:var(--marigold);">${low}</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Set availability</h3><span class="lr-sub">this is exactly what buyers will see</span></div>
+    ${mine.map(p=>`
+    <div class="list-row">
+      <div class="lr-left"><div class="lr-icon">${emojiFor(p.name)}</div><div><div class="lr-name">${p.name}</div><div class="lr-sub">${p.stock} ${p.unit} available${p.stock>0 && p.stock<10 ? ' · running low':''}</div></div></div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div class="field-inline"><input type="number" value="${p.stock}" min="0" style="width:56px;" onchange="updateProduct('${p.id}','stock',this.value)"/><span>${p.unit}</span></div>
+        <label class="switch"><input type="checkbox" ${p.stock>0?'checked':''} onchange="toggleStock('${p.id}', this.checked)"/><div class="track"><div class="knob"></div></div></label>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+function toggleStock(id, on){
+  const p = state.products.find(p=>p.id===id);
+  if(on && p.stock===0){ p.stock = p._lastStock || 10; }
+  if(!on){ p._lastStock = p.stock || 10; p.stock = 0; }
+  toast(`${p.name} marked ${on?'in stock':'out of stock'}`, on?'✅':'🚫');
+  renderFarmerTab('stock');
+}
+
+function deliveryTabHTML(){
+  const me = farmerById(state.currentFarmerId);
+  const opts = [
+    {k:'available', ic:'✅', name:'Available now', desc:'Ready to deliver orders today'},
+    {k:'out', ic:'🚚', name:'Out for delivery', desc:'On the road right now'},
+    {k:'off', ic:'🌙', name:'Off duty', desc:'Not delivering today'},
+  ];
+  return `
+  <div class="panel">
+    <div class="panel-head"><h3>Your delivery status</h3></div>
+    <div class="status-pills">
+      ${opts.map(o=>`<button class="status-pill ${me.delivery===o.k?'selected':''}" onclick="setDelivery('${o.k}')"><span class="sp-ic">${o.ic}</span><span class="name">${o.name}</span><span class="lr-sub">${o.desc}</span></button>`).join('')}
+    </div>
+    <div class="form-field" style="margin-top:18px;">
+      <label>Note for buyers (optional)</label>
+      <input type="text" class="plain" id="delivery-note" value="${me.note}" placeholder="e.g. Back in the village by 5pm" onchange="setDeliveryNote(this.value)"/>
+    </div>
+    <div class="preview-card">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:1.4rem;">${me.avatar}</span>
+        <div><div class="lr-name">${me.name}</div><div class="lr-sub"><span class="status-dot ${me.delivery}"></span> ${opts.find(o=>o.k===me.delivery).name}${me.note?' · '+me.note:''}</div></div>
+      </div>
+      <span class="lr-sub">↑ this is your live card on the buyer app</span>
+    </div>
+  </div>`;
+}
+function setDelivery(k){
+  farmerById(state.currentFarmerId).delivery = k;
+  toast('Delivery status updated', '🚚');
+  renderFarmerTab('delivery');
+}
+function setDeliveryNote(v){
+  farmerById(state.currentFarmerId).note = v;
+  toast('Note saved', '📝');
+}
+
+/* =====================================================================
+   CONSUMER DASHBOARD
+   ===================================================================== */
+document.getElementById('consumer-tabs').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.ctab');
+  if(!btn) return;
+  document.querySelectorAll('.ctab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  state.consumerTab = btn.dataset.ctab;
+  if(state.consumerTab==='browse') renderConsumerBrowse();
+  else renderMyFarmers();
+});
+
+function deliveryLabel(k){ return k==='available' ? 'Available now' : k==='out' ? 'Out for delivery' : 'Off duty'; }
+
+function renderConsumerBrowse(){
+  const q = (document.getElementById('consumer-search').value||'').toLowerCase();
+  const filtered = state.products.filter(p=>{
+    const f = farmerById(p.farmerId);
+    return !q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q) || f.name.toLowerCase().includes(q) || f.village.toLowerCase().includes(q);
+  });
+  const c = document.getElementById('consumer-content');
+  const chips = state.farmers.map(f=>`<div class="farmer-chip ${state.consumerFarmerFilter===f.id?'active':''}" onclick="filterByFarmer('${f.id}')"><span class="fc-avatar">${f.avatar}</span>${f.name.split(' ')[0]} <span class="status-dot ${f.delivery}"></span></div>`).join('');
+  const filtered2 = state.consumerFarmerFilter ? filtered.filter(p=>p.farmerId===state.consumerFarmerFilter) : filtered;
+  c.innerHTML = `
+    <div class="farmer-strip">
+      <div class="farmer-chip ${!state.consumerFarmerFilter?'active':''}" onclick="filterByFarmer(null)">🌍 All farmers</div>
+      ${chips}
+    </div>
+    ${filtered2.length===0 ? `<div class="empty-state"><div class="es-ic">🔍</div><h3>Nothing matches yet</h3><p>Try a different crop, farmer, or village.</p></div>` : `
+    <div class="cprod-grid">
+      ${filtered2.map(p=>{
+        const f = farmerById(p.farmerId);
+        const inCart = state.cart.find(c=>c.productId===p.id);
+        return `<div class="cprod-card">
+          <div class="cprod-hero">${emojiFor(p.name)}</div>
+          <div class="cprod-body">
+            <div class="cprod-farmer"><span class="status-dot ${f.delivery}"></span> ${f.name} · ${f.village.split(',')[0]}</div>
+            <div class="p-name">${p.name}</div>
+            <div class="cprod-price">₹${p.price} <span>/ ${p.unit}</span></div>
+            <div class="cprod-foot">
+              <span class="stock-badge ${p.stock>0?'in':'out'}">${p.stock>0?'In stock':'Out of stock'}</span>
+              ${p.stock>0 ? (inCart ? `<div class="qty-stepper"><button onclick="changeCartQty('${p.id}',-1)">−</button><span>${inCart.qty}</span><button onclick="changeCartQty('${p.id}',1)">+</button></div>` : `<button class="btn btn-water btn-sm" onclick="addToCart('${p.id}')">Add</button>`) : `<button class="btn btn-ghost btn-sm" disabled style="opacity:.5;">Sold out</button>`}
+            </div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:4px;" onclick="openChat('${f.id}')">💬 Chat with ${f.name.split(' ')[0]}</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`}
+  `;
+}
+function filterByFarmer(id){ state.consumerFarmerFilter = id; renderConsumerBrowse(); }
+
+function renderMyFarmers(){
+  const c = document.getElementById('consumer-content');
+  c.innerHTML = `<div class="cprod-grid">${state.farmers.map(f=>`
+    <div class="panel" style="padding:20px;">
+      <div style="display:flex; gap:12px; align-items:center;">
+        <div class="lr-icon" style="width:46px;height:46px;font-size:1.4rem;">${f.avatar}</div>
+        <div><div class="lr-name">${f.name}</div><div class="lr-sub">${f.village}</div></div>
+      </div>
+      <div class="lr-sub" style="margin-top:12px;"><span class="status-dot ${f.delivery}"></span> ${deliveryLabel(f.delivery)}${f.note?' · '+f.note:''}</div>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn btn-ghost btn-sm" style="flex:1;" onclick="filterByFarmer('${f.id}'); document.querySelector('[data-ctab=browse]').click();">View crops</button>
+        <button class="btn btn-water btn-sm" style="flex:1;" onclick="openChat('${f.id}')">💬 Chat</button>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function addToCart(id){
+  state.cart.push({productId:id, qty:1});
+  updateCartCount();
+  toast('Added to cart', '🛒');
+  renderConsumerBrowse();
+}
+function changeCartQty(id, delta){
+  const item = state.cart.find(c=>c.productId===id);
+  if(!item) return;
+  item.qty += delta;
+  if(item.qty<=0) state.cart = state.cart.filter(c=>c.productId!==id);
+  updateCartCount();
+  renderConsumerBrowse();
+  if(document.getElementById('cart-drawer').classList.contains('open')) renderCart();
+}
+function updateCartCount(){
+  const n = state.cart.reduce((s,c)=>s+c.qty,0);
+  const el = document.getElementById('cart-count');
+  el.textContent = n;
+  el.classList.toggle('hidden', n===0);
+}
+
+function openCart(){ renderCart(); document.getElementById('cart-drawer').classList.add('open'); }
+function closeCart(){ document.getElementById('cart-drawer').classList.remove('open'); }
+function renderCart(){
+  const body = document.getElementById('cart-body');
+  const foot = document.getElementById('cart-foot');
+  if(state.cart.length===0){
+    body.innerHTML = `<div class="empty-state"><div class="es-ic">🛍️</div><h3>Your cart is empty</h3><p>Browse crops and add what you need.</p></div>`;
+    foot.innerHTML = '';
+    return;
+  }
+  let total = 0;
+  body.innerHTML = state.cart.map(c=>{
+    const p = state.products.find(p=>p.id===c.productId);
+    const f = farmerById(p.farmerId);
+    total += p.price*c.qty;
+    return `<div class="cart-item">
+      <div class="ci-emoji">${emojiFor(p.name)}</div>
+      <div style="flex:1;">
+        <div class="ci-name">${p.name}</div>
+        <div class="ci-sub">${f.name.split(' ')[0]} · ₹${p.price}/${p.unit}</div>
+        <div class="qty-stepper" style="margin-top:8px;"><button onclick="changeCartQty('${p.id}',-1)">−</button><span>${c.qty}</span><button onclick="changeCartQty('${p.id}',1)">+</button></div>
+      </div>
+      <div class="lr-name">₹${p.price*c.qty}</div>
+    </div>`;
+  }).join('');
+  foot.innerHTML = `<div class="cart-total-row"><span>Total</span><span>₹${total}</span></div><button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="checkout()">Place order</button>`;
+}
+function checkout(){
+  toast('Order placed! Farmers have been notified 🌾', '🎉');
+  state.cart = [];
+  updateCartCount();
+  closeCart();
+  renderConsumerBrowse();
+}
+
+/* ---------- chat ---------- */
+const canned = [
+  "Sounds good, I'll set that aside for you!",
+  "Yes, freshly picked this morning 🌱",
+  "I can deliver that by this evening.",
+  "Thanks for reaching out — anything else you need?",
+];
+function openChat(farmerId){
+  state.activeChatFarmer = farmerId;
+  const f = farmerById(farmerId);
+  document.getElementById('chat-avatar').textContent = f.avatar;
+  document.getElementById('chat-name').textContent = f.name;
+  document.getElementById('chat-status').innerHTML = `<span class="status-dot ${f.delivery}"></span> ${deliveryLabel(f.delivery)}`;
+  renderChatMsgs();
+  document.getElementById('chat-drawer').classList.add('open');
+}
+function closeChat(){ document.getElementById('chat-drawer').classList.remove('open'); }
+function renderChatMsgs(){
+  const f = state.activeChatFarmer;
+  if(!f) return;
+  const msgs = state.chats[f] || (state.chats[f] = []);
+  const el = document.getElementById('chat-msgs');
+  el.innerHTML = msgs.map(m=>`<div class="msg ${m.from==='me'?'me':'them'}">${m.text}<div class="msg-time">${m.time}</div></div>`).join('');
+  el.parentElement.scrollTop = el.parentElement.scrollHeight;
+}
+function sendChat(){
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if(!text || !state.activeChatFarmer) return;
+  const f = state.activeChatFarmer;
+  const now = new Date();
+  const time = now.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});
+  state.chats[f].push({from:'me', text, time});
+  input.value = '';
+  renderChatMsgs();
+  setTimeout(()=>{
+    state.chats[f].push({from:'them', text: canned[Math.floor(Math.random()*canned.length)], time: new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'})});
+    renderChatMsgs();
+  }, 900+Math.random()*700);
+}
+</script>
+</body>
+</html>
