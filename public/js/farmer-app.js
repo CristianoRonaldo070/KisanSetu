@@ -19,7 +19,26 @@ function toast(msg, icon) {
   setTimeout(() => { el.classList.add('leave'); setTimeout(() => el.remove(), 320); }, 2400);
 }
 
+const tr = (k, d) => window.KS_I18N ? KS_I18N.t(k, d) : (d || k);
+
 document.addEventListener('DOMContentLoaded', async () => {
+    const langSlot = document.getElementById('farmer-lang-slot');
+    if (langSlot && window.KS_I18N) langSlot.innerHTML = KS_I18N.getSelectorHTML();
+
+    window.addEventListener('ks_language_changed', () => {
+        const activeBtn = document.querySelector('#farmer-nav button.active');
+        const tab = activeBtn ? activeBtn.dataset.tab : 'products';
+        updateFarmerTabTitles(tab);
+        switch(tab) {
+            case 'products': renderProductsTab(); break;
+            case 'revenue': renderRevenueTab(); break;
+            case 'stock': renderStockTab(); break;
+            case 'delivery': renderDeliveryTab(); break;
+            case 'chat-requests': renderChatTab(); break;
+            case 'profile': renderProfileTab(); break;
+        }
+    });
+
     setupNav();
     const authed = await KS_AUTH.requireAuth();
     if (!authed) return;
@@ -40,6 +59,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProductsTab();
 });
 
+function updateFarmerTabTitles(tab) {
+    const titleEl = document.getElementById('farmer-tab-title');
+    const subEl = document.getElementById('farmer-tab-sub');
+    if (!titleEl || !subEl) return;
+    switch(tab) {
+        case 'products':
+            titleEl.textContent = tr('head_products_title', 'Your Products');
+            subEl.textContent = tr('head_products_sub', 'Add crops, tweak prices, retire what\'s sold out.');
+            break;
+        case 'revenue':
+            titleEl.textContent = tr('head_revenue_title', 'Revenue & Costs');
+            subEl.textContent = tr('head_revenue_sub', 'Track your earnings and profit margins.');
+            break;
+        case 'stock':
+            titleEl.textContent = tr('head_stock_title', 'Stock Management');
+            subEl.textContent = tr('head_stock_sub', 'Keep your inventory up to date.');
+            break;
+        case 'delivery':
+            titleEl.textContent = tr('head_delivery_title', 'Delivery Settings');
+            subEl.textContent = tr('head_delivery_sub', 'Manage your availability and delivery notes.');
+            break;
+        case 'chat-requests':
+            titleEl.textContent = tr('head_chat_title', 'Chat & Requests');
+            subEl.textContent = tr('head_chat_sub', 'Connect with consumers and fellow farmers.');
+            break;
+        case 'profile':
+            titleEl.textContent = tr('head_profile_title', 'Your Profile');
+            subEl.textContent = tr('head_profile_sub', 'Update your personal info and location.');
+            break;
+    }
+}
+
 function setupNav() {
     const btns = document.querySelectorAll('#farmer-nav button');
     btns.forEach(btn => {
@@ -48,44 +99,17 @@ function setupNav() {
             btn.classList.add('active');
             const tab = btn.dataset.tab;
             
-            const titleEl = document.getElementById('farmer-tab-title');
-            const subEl = document.getElementById('farmer-tab-sub');
             const addBtn = document.getElementById('add-product-btn');
+            addBtn.style.display = (tab === 'products') ? 'inline-flex' : 'none';
             
-            addBtn.style.display = 'none';
-            
+            updateFarmerTabTitles(tab);
             switch(tab) {
-                case 'products':
-                    titleEl.textContent = 'Your Products';
-                    subEl.textContent = 'Add crops, tweak prices, retire what\'s sold out.';
-                    addBtn.style.display = 'inline-flex';
-                    renderProductsTab();
-                    break;
-                case 'revenue':
-                    titleEl.textContent = 'Revenue & Costs';
-                    subEl.textContent = 'Track your earnings and profit margins.';
-                    renderRevenueTab();
-                    break;
-                case 'stock':
-                    titleEl.textContent = 'Stock Management';
-                    subEl.textContent = 'Keep your inventory up to date.';
-                    renderStockTab();
-                    break;
-                case 'delivery':
-                    titleEl.textContent = 'Delivery Settings';
-                    subEl.textContent = 'Manage your availability and delivery notes.';
-                    renderDeliveryTab();
-                    break;
-                case 'chat-requests':
-                    titleEl.textContent = 'Chat & Requests';
-                    subEl.textContent = 'Connect with consumers and fellow farmers.';
-                    renderChatTab();
-                    break;
-                case 'profile':
-                    titleEl.textContent = 'Your Profile';
-                    subEl.textContent = 'Update your personal info and location.';
-                    renderProfileTab();
-                    break;
+                case 'products': renderProductsTab(); break;
+                case 'revenue': renderRevenueTab(); break;
+                case 'stock': renderStockTab(); break;
+                case 'delivery': renderDeliveryTab(); break;
+                case 'chat-requests': renderChatTab(); break;
+                case 'profile': renderProfileTab(); break;
             }
         });
     });
@@ -108,7 +132,8 @@ async function renderProductsTab() {
         let html = '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">';
         products.forEach(p => {
             currentFarmerProducts[p.id] = p;
-            const stockStatus = p.stock > 0 ? `<span class="stock-badge in">In Stock</span>` : `<span class="stock-badge out">Out of Stock</span>`;
+            const stockText = p.stock > 0 ? tr('stat_in_stock', 'In Stock') : tr('stat_out_stock', 'Out of Stock');
+            const stockStatus = `<span class="stock-badge ${p.stock > 0 ? 'in' : 'out'}">${stockText}</span>`;
             const visual = (p.emoji && (p.emoji.startsWith('data:image') || p.emoji.startsWith('http')))
                 ? `<img src="${p.emoji}" alt="${p.name}" style="width:64px; height:64px; object-fit:cover; border-radius:12px; border:1px solid #3a4a32; display:block; margin:0 auto 10px;">`
                 : `<div style="font-size:3rem; margin-bottom:10px; text-align:center;">${p.emoji || emojiFor(p.name)}</div>`;
@@ -120,8 +145,8 @@ async function renderProductsTab() {
                     <p class="lr-sub">${p.category} • ₹${p.price}/${p.unit}</p>
                     <div style="margin-top:10px; margin-bottom:10px;">${stockStatus} (${p.stock} ${p.unit})</div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn btn-sm btn-ghost" onclick="editProduct('${p.id}')">Edit</button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>
+                        <button class="btn btn-sm btn-ghost" onclick="editProduct('${p.id}')">${tr('btn_edit', 'Edit')}</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">${tr('btn_delete', 'Delete')}</button>
                     </div>
                 </div>
             `;
@@ -359,19 +384,19 @@ async function renderRevenueTab() {
         let html = `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:20px; margin-bottom:20px;">
                 <div class="panel stat-card">
-                    <div class="lr-sub">Revenue Potential</div>
+                    <div class="lr-sub">${tr('stat_rev_potential', 'Revenue Potential')}</div>
                     <div style="font-size:2rem; font-weight:700;">₹${potentialRevenue}</div>
                 </div>
                 <div class="panel stat-card">
-                    <div class="lr-sub">Total Cost Basis</div>
+                    <div class="lr-sub">${tr('stat_total_cost', 'Total Cost Basis')}</div>
                     <div style="font-size:2rem; font-weight:700;">₹${totalCost}</div>
                 </div>
                 <div class="panel stat-card" style="border-left:4px solid var(--leaf);">
-                    <div class="lr-sub">Estimated Margin</div>
+                    <div class="lr-sub">${tr('stat_est_margin', 'Estimated Margin')}</div>
                     <div style="font-size:2rem; font-weight:700; color:var(--leaf);">₹${profit}</div>
                 </div>
             </div>
-            <h3>Per-Crop Margin</h3>
+            <h3>${tr('per_crop_margin', 'Per-Crop Margin')}</h3>
             <div class="panel" style="margin-top:10px;">
         `;
         
@@ -387,8 +412,8 @@ async function renderRevenueTab() {
                         </div>
                     </div>
                     <div style="text-align:right;">
-                        <div>Profit: ₹${margin}/${p.unit}</div>
-                        <div class="lr-sub" style="font-size:0.8rem;">Price: ₹${p.price} | Cost: ₹${p.cost_price||0}</div>
+                        <div>${tr('profit', 'Profit')}: ₹${margin}/${p.unit}</div>
+                        <div class="lr-sub" style="font-size:0.8rem;">${tr('price', 'Price')}: ₹${p.price} | ${tr('cost', 'Cost')}: ₹${p.cost_price||0}</div>
                     </div>
                 </div>
             `;
@@ -413,10 +438,10 @@ async function renderStockTab() {
         
         let html = `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:20px; margin-bottom:20px;">
-                <div class="panel stat-card"><div>Total Crops</div><div style="font-size:1.5rem; font-weight:bold;">${total}</div></div>
-                <div class="panel stat-card" style="border-left:3px solid var(--leaf);"><div>In Stock</div><div style="font-size:1.5rem; font-weight:bold;">${inStock}</div></div>
-                <div class="panel stat-card" style="border-left:3px solid var(--marigold);"><div>Low Stock</div><div style="font-size:1.5rem; font-weight:bold;">${lowStock}</div></div>
-                <div class="panel stat-card" style="border-left:3px solid var(--danger);"><div>Out of Stock</div><div style="font-size:1.5rem; font-weight:bold;">${outOfStock}</div></div>
+                <div class="panel stat-card"><div>${tr('stat_total_crops', 'Total Crops')}</div><div style="font-size:1.5rem; font-weight:bold;">${total}</div></div>
+                <div class="panel stat-card" style="border-left:3px solid var(--leaf);"><div>${tr('stat_in_stock', 'In Stock')}</div><div style="font-size:1.5rem; font-weight:bold;">${inStock}</div></div>
+                <div class="panel stat-card" style="border-left:3px solid var(--marigold);"><div>${tr('stat_low_stock', 'Low Stock')}</div><div style="font-size:1.5rem; font-weight:bold;">${lowStock}</div></div>
+                <div class="panel stat-card" style="border-left:3px solid var(--danger);"><div>${tr('stat_out_stock', 'Out of Stock')}</div><div style="font-size:1.5rem; font-weight:bold;">${outOfStock}</div></div>
             </div>
             <div class="panel">
         `;
@@ -432,7 +457,7 @@ async function renderStockTab() {
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
                         <input type="number" class="plain" style="width:80px; padding:5px;" id="stock-edit-${p.id}" value="${p.stock}" min="0">
-                        <button class="btn btn-sm btn-ghost" onclick="updateStock('${p.id}')">Save</button>
+                        <button class="btn btn-sm btn-ghost" onclick="updateStock('${p.id}')">${tr('btn_save', 'Save')}</button>
                     </div>
                 </div>
             `;
@@ -459,7 +484,7 @@ async function updateStock(id) {
 }
 
 async function renderDeliveryTab() {
-    contentEl.innerHTML = '<p>Loading delivery settings...</p>';
+    contentEl.innerHTML = `<p>${tr('loading', 'Loading...')}</p>`;
     try {
         let profile = await KS_AUTH.getProfile();
         const user = await KS_AUTH.getUser();
@@ -479,19 +504,19 @@ async function renderDeliveryTab() {
             <div class="panel" style="max-width:550px;">
                 <div class="form-grid">
                     <div class="form-field" style="grid-column:1/-1;">
-                        <label>Current Availability</label>
+                        <label>${tr('delivery_status', 'Delivery Status')}</label>
                         <select class="plain" id="d-status">
-                            <option value="available" ${currentStatus==='available'?'selected':''}>🟢 Available for delivery / pickup</option>
-                            <option value="out" ${currentStatus==='out'?'selected':''}>🚚 Out for delivery right now</option>
-                            <option value="off" ${currentStatus==='off'?'selected':''}>🔴 Off duty (Closed today)</option>
+                            <option value="available" ${currentStatus==='available'?'selected':''}>🟢 ${tr('status_available', 'Available for delivery')}</option>
+                            <option value="out" ${currentStatus==='out'?'selected':''}>🚚 ${tr('status_out', 'Out on delivery right now')}</option>
+                            <option value="off" ${currentStatus==='off'?'selected':''}>🔴 ${tr('status_off', 'Not delivering today')}</option>
                         </select>
                     </div>
                     <div class="form-field" style="grid-column:1/-1;">
-                        <label>Delivery Note (shown to consumers on marketplace)</label>
-                        <input type="text" class="plain" id="d-note" value="${currentNote.replace(/"/g, '&quot;')}" placeholder="e.g. Free delivery within 5km, orders after 6 PM next day">
+                        <label>${tr('delivery_note', 'Delivery Note')}</label>
+                        <input type="text" class="plain" id="d-note" value="${currentNote.replace(/"/g, '&quot;')}" placeholder="${tr('delivery_note_placeholder', 'e.g. Free delivery within 5km, orders after 6 PM next day')}">
                     </div>
                 </div>
-                <button class="btn btn-primary" style="margin-top:18px;" onclick="saveDelivery()">Save Availability</button>
+                <button class="btn btn-primary" style="margin-top:18px;" onclick="saveDelivery()">${tr('save_delivery_btn', 'Save Delivery Settings')}</button>
             </div>
         `;
     } catch(e) {
@@ -526,20 +551,20 @@ async function renderChatTab() {
     contentEl.innerHTML = `
         <div class="user-search-wrap" style="margin-bottom:20px;">
             <div style="display:flex; gap:10px;">
-                <input type="text" class="plain" id="user-search-input" placeholder="Search for users..." onkeydown="if(event.key==='Enter')searchUsers()">
-                <button class="btn btn-primary" onclick="searchUsers()">Search</button>
+                <input type="text" class="plain" id="user-search-input" placeholder="${tr('search_placeholder_farmer', 'Search buyers or farmers by name...')}" onkeydown="if(event.key==='Enter')searchUsers()">
+                <button class="btn btn-primary" onclick="searchUsers()">${tr('btn_search', 'Search')}</button>
             </div>
             <div id="user-search-results" class="search-results" style="margin-top:10px; display:grid; gap:10px;"></div>
         </div>
         
         <div style="display:flex; gap:20px;">
             <div style="flex:1;">
-                <h3>Pending Requests</h3>
-                <div id="pending-requests" class="requests-grid" style="display:grid; gap:10px; margin-top:10px;">Loading...</div>
+                <h3>${tr('pending_requests', 'Pending Requests')}</h3>
+                <div id="pending-requests" class="requests-grid" style="display:grid; gap:10px; margin-top:10px;">${tr('loading', 'Loading...')}</div>
             </div>
             <div style="flex:1;">
-                <h3>Active Conversations</h3>
-                <div id="active-conversations" style="display:grid; gap:10px; margin-top:10px;">Loading...</div>
+                <h3>${tr('active_convs', 'Active Conversations')}</h3>
+                <div id="active-conversations" style="display:grid; gap:10px; margin-top:10px;">${tr('loading', 'Loading...')}</div>
             </div>
         </div>
     `;
@@ -551,13 +576,13 @@ async function searchUsers() {
     const q = document.getElementById('user-search-input').value;
     if(!q) return;
     const resEl = document.getElementById('user-search-results');
-    resEl.innerHTML = '<p>Searching...</p>';
+    resEl.innerHTML = `<p>${tr('searching', 'Searching...')}</p>`;
     try {
         const res = await KS_AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
         const users = await res.json();
         
         if(!users || users.length === 0) {
-            resEl.innerHTML = '<p class="lr-sub">No users found.</p>';
+            resEl.innerHTML = `<p class="lr-sub">${tr('no_users_found', 'No users found.')}</p>`;
             return;
         }
         
@@ -569,10 +594,10 @@ async function searchUsers() {
                         <div class="ur-avatar" style="font-size:1.5rem;">👤</div>
                         <div>
                             <div style="font-weight:bold;">${u.full_name || 'Unknown'}</div>
-                            <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${u.role}</div>
+                            <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${u.role === 'farmer' ? tr('role_farmer', 'Farmer') : tr('role_consumer', 'Consumer')}</div>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-water" onclick="sendChatReq('${u.id}')">Send Request</button>
+                    <button class="btn btn-sm btn-water" onclick="sendChatReq('${u.id}')">${tr('btn_send_request', 'Send Request')}</button>
                 </div>
             `;
         });
@@ -584,15 +609,30 @@ async function searchUsers() {
 
 async function sendChatReq(toUserId) {
     try {
+        const client = window.supabaseClient;
+        const user = await KS_AUTH.getUser();
+        if (client && user) {
+            const { error: directErr } = await client.from('chat_requests').insert({
+                from_user_id: user.id,
+                to_user_id: toUserId,
+                status: 'pending'
+            });
+            if (!directErr) {
+                toast(tr('chat_req_sent', 'Chat request sent!'));
+                loadChatData();
+                return;
+            }
+        }
         const res = await KS_AUTH.apiFetch('/api/chat-requests', { method: 'POST', body: JSON.stringify({ to_user_id: toUserId }) });
-        if(res.ok) {
-            toast('Chat request sent!');
+        if(res && res.ok) {
+            toast(tr('chat_req_sent', 'Chat request sent!'));
             loadChatData();
         } else {
-            toast('Failed to send request', '❌');
+            const errData = res ? await res.json().catch(() => ({})) : {};
+            toast(errData.error || 'Failed to send request', '❌');
         }
     } catch(e) {
-        toast('Error sending request', '❌');
+        toast('Error sending request: ' + e.message, '❌');
     }
 }
 
@@ -617,10 +657,10 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div><strong>${r.other_user.full_name}</strong> sent a request</div>
+                                    <div><strong>${r.other_user.full_name}</strong> ${tr('sent_req_text', 'sent a request')}</div>
                                     <div style="display:flex; gap:5px;">
-                                        <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">Accept</button>
-                                        <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">Decline</button>
+                                        <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">${tr('btn_accept', 'Accept')}</button>
+                                        <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">${tr('btn_decline', 'Decline')}</button>
                                     </div>
                                 </div>
                             </div>
@@ -629,15 +669,15 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div>You requested to chat with <strong>${r.other_user.full_name}</strong></div>
-                                    <div class="lr-sub">Pending</div>
+                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${r.other_user.full_name}</strong></div>
+                                    <div class="lr-sub">${tr('stat_pending', 'Pending')}</div>
                                 </div>
                             </div>
                         `;
                     }
                 }
             });
-            pendingEl.innerHTML = reqHtml || '<p class="lr-sub">No pending requests.</p>';
+            pendingEl.innerHTML = reqHtml || `<p class="lr-sub">${tr('no_pending_req', 'No pending requests.')}</p>`;
         }
         
         if(activeEl) {
@@ -651,7 +691,7 @@ async function loadChatData() {
                     </div>
                 `;
             });
-            activeEl.innerHTML = convHtml || '<p class="lr-sub">No active conversations.</p>';
+            activeEl.innerHTML = convHtml || `<p class="lr-sub">${tr('no_active_conv', 'No active conversations.')}</p>`;
         }
         
     } catch(e) {
@@ -674,7 +714,7 @@ async function respondReq(id, status) {
 }
 
 async function renderProfileTab() {
-    contentEl.innerHTML = '<p>Loading profile...</p>';
+    contentEl.innerHTML = `<p>${tr('loading', 'Loading profile...')}</p>`;
     try {
         let profile = await KS_AUTH.getProfile();
         const user = await KS_AUTH.getUser();
@@ -699,28 +739,28 @@ async function renderProfileTab() {
         contentEl.innerHTML = `
             <div class="panel" style="max-width:620px;">
                 <div style="display:flex; gap:20px; align-items:center; margin-bottom:24px;">
-                    <div style="cursor:pointer; position:relative;" title="Click to upload profile photo" onclick="document.getElementById('photo-upload').click()">
+                    <div style="cursor:pointer; position:relative;" title="${tr('change_photo', 'Change')}" onclick="document.getElementById('photo-upload').click()">
                         ${avatarDisplay}
                         <div style="position:absolute; bottom:0; right:0; background:var(--leaf); color:#12180f; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:bold; border:2px solid #161f14;">📷</div>
                     </div>
                     <input type="file" id="photo-upload" style="display:none;" onchange="uploadPhoto(this)" accept="image/*">
                     <div>
                         <h3 id="profile-heading-name">${profile.full_name || 'Farmer'}</h3>
-                        <div class="lr-sub">Set your full name and farm details so consumers can search and contact you.</div>
+                        <div class="lr-sub">${tr('profile_sub_farmer', 'Set your full name and farm details so consumers can search and contact you.')}</div>
                     </div>
                 </div>
                 
                 <div class="form-grid">
-                    <div class="form-field"><label>Full Name *</label><input type="text" class="plain" id="p-name" value="${profile.full_name||''}" placeholder="e.g. Ramesh Kumar"></div>
-                    <div class="form-field"><label>Phone Number</label><input type="text" class="plain" id="p-phone" value="${profile.phone||''}" placeholder="e.g. 9876543210"></div>
-                    <div class="form-field" style="grid-column:1/-1;"><label>Farm / Home Address</label><input type="text" class="plain" id="p-addr" value="${profile.address||''}" placeholder="e.g. Green Valley Farm, Road 3"></div>
-                    <div class="form-field"><label>City</label><input type="text" class="plain" id="p-city" value="${profile.city||''}" placeholder="e.g. Pune"></div>
-                    <div class="form-field"><label>State</label><input type="text" class="plain" id="p-state" value="${profile.state_province||''}" placeholder="e.g. Maharashtra"></div>
+                    <div class="form-field"><label>${tr('label_name', 'Full Name')} *</label><input type="text" class="plain" id="p-name" value="${profile.full_name||''}" placeholder="${tr('placeholder_name', 'e.g. Ramesh Kumar')}"></div>
+                    <div class="form-field"><label>${tr('profile_phone', 'Phone Number')}</label><input type="text" class="plain" id="p-phone" value="${profile.phone||''}" placeholder="e.g. 9876543210"></div>
+                    <div class="form-field" style="grid-column:1/-1;"><label>${tr('profile_address', 'Farm / Home Address')}</label><input type="text" class="plain" id="p-addr" value="${profile.address||''}" placeholder="e.g. Green Valley Farm, Road 3"></div>
+                    <div class="form-field"><label>${tr('profile_city', 'City / Town')}</label><input type="text" class="plain" id="p-city" value="${profile.city||''}" placeholder="e.g. Pune"></div>
+                    <div class="form-field"><label>${tr('profile_state', 'State / Province')}</label><input type="text" class="plain" id="p-state" value="${profile.state_province||''}" placeholder="e.g. Maharashtra"></div>
                 </div>
                 
                 <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
-                    <button class="btn btn-ghost" onclick="useLocation()">📍 Use Current GPS Location</button>
-                    <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+                    <button class="btn btn-ghost" onclick="useLocation()">${tr('btn_location', '📍 Use Current GPS Location')}</button>
+                    <button class="btn btn-primary" onclick="saveProfile()">${tr('btn_save_profile', 'Save Profile')}</button>
                 </div>
                 <input type="hidden" id="p-lat" value="${profile.latitude||''}">
                 <input type="hidden" id="p-lng" value="${profile.longitude||''}">
@@ -799,7 +839,7 @@ async function saveProfile() {
         await KS_AUTH.apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(data) });
         
         document.getElementById('farmer-name-pill').textContent = name;
-        toast('Profile saved successfully! 🎉');
+        toast(tr('save_profile_success', 'Profile saved successfully! 🎉'));
         renderProfileTab();
     } catch(e) {
         console.error('Save profile error:', e);

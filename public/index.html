@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js"></script>
 </head>
 <body>
 
@@ -24,36 +25,39 @@
 <!-- ===================== LANDING ===================== -->
 <div id="landing">
   <div class="topbar">
-    <div class="brand"><span class="dot"></span>KisanSetu</div>
-    <nav>
-      <a href="/auth.html?role=farmer" style="text-decoration:none;">For Farmers</a>
-      <a href="/auth.html?role=consumer" style="text-decoration:none;">For Buyers</a>
-      <a href="#contact" style="text-decoration:none;">About</a>
-    </nav>
+    <div class="brand"><span class="dot"></span><span data-i18n="brand_name">KisanSetu</span></div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div id="landing-lang-picker"></div>
+      <nav>
+        <a href="/auth.html?role=farmer" data-i18n="for_farmers" style="text-decoration:none;">For Farmers</a>
+        <a href="/auth.html?role=consumer" data-i18n="for_buyers" style="text-decoration:none;">For Buyers</a>
+        <a href="#contact" data-i18n="about" style="text-decoration:none;">About</a>
+      </nav>
+    </div>
   </div>
 
   <div class="hero-wrap">
     <div class="hero-headline">
-      <h1>Where the <em>harvest</em><br/>meets the home.</h1>
-      <p>KisanSetu is a straight line from field to kitchen — farmers set their own prices and delivery windows, buyers order straight from the source. No middlemen standing on the bridge.</p>
+      <h1 data-i18n="hero_title">Where the <em>harvest</em><br/>meets the home.</h1>
+      <p data-i18n="hero_sub">Connecting Indian farmers directly with consumers. Fresh harvests, transparent pricing, zero middlemen.</p>
     </div>
 
     <div class="role-seam">
       <div class="role-card farmer">
         <div>
           <div class="role-icon">🌾</div>
-          <h3>I grow the produce</h3>
-          <p class="desc">List your crops, set your own prices, track what's selling, and tell buyers when you're out on delivery.</p>
+          <h3 data-i18n="farmer_card_title">I am a Farmer</h3>
+          <p class="desc" data-i18n="farmer_card_desc">List your fresh harvest, control your prices, track profits, and connect directly with local buyers.</p>
         </div>
-        <button class="role-btn farmer-btn" onclick="window.location.href='/auth.html?role=farmer'">Continue as a Farmer</button>
+        <button class="role-btn farmer-btn" onclick="window.location.href='/auth.html?role=farmer'" data-i18n="for_farmers">Continue as a Farmer</button>
       </div>
       <div class="role-card consumer">
         <div>
           <div class="role-icon">🛒</div>
-          <h3>I'm here to buy</h3>
-          <p class="desc">Search nearby farmers, fill your cart straight from the field, and chat directly with the person who grew it.</p>
+          <h3 data-i18n="buyer_card_title">I am a Buyer</h3>
+          <p class="desc" data-i18n="buyer_card_desc">Buy farm-fresh vegetables, fruits, and grains directly from nearby verified farmers at honest rates.</p>
         </div>
-        <button class="role-btn consumer-btn" onclick="window.location.href='/auth.html?role=consumer'">Continue as a Buyer</button>
+        <button class="role-btn consumer-btn" onclick="window.location.href='/auth.html?role=consumer'" data-i18n="for_buyers">Continue as a Buyer</button>
       </div>
       <div class="seam-badge">सेतु</div>
     </div>
@@ -62,20 +66,20 @@
   </div>
 
   <div class="contact-section" id="contact">
-    <h2>Get in Touch</h2>
-    <p>Have questions about joining KisanSetu or need help with your account? We're here to help.</p>
+    <h2 data-i18n="contact_head">Get in Touch</h2>
+    <p data-i18n="contact_sub">Have questions about joining KisanSetu or need help with your account? We're here to help.</p>
     <div class="contact-grid">
       <div class="contact-card">
         <div class="cc-icon">✉️</div>
         <div>
-          <div class="cc-label">Email Us</div>
+          <div class="cc-label" data-i18n="contact_email_label">Email Us</div>
           <div class="cc-value">cursedcoders0626@gmail.com</div>
         </div>
       </div>
       <div class="contact-card">
         <div class="cc-icon">👥</div>
         <div>
-          <div class="cc-label">Developed By</div>
+          <div class="cc-label" data-i18n="team_label">Developed By</div>
           <div class="cc-value">Cursed Coders</div>
         </div>
       </div>
@@ -84,13 +88,13 @@
 
   <footer class="site-footer">
     <div class="footer-brand">
-      <div class="brand"><span class="dot"></span>KisanSetu</div>
-      <div class="footer-credit">Developed by <span>Cursed Coders</span></div>
+      <div class="brand"><span class="dot"></span><span data-i18n="brand_name">KisanSetu</span></div>
+      <div class="footer-credit"><span data-i18n="dev_by">Developed by</span> <span>Cursed Coders</span></div>
     </div>
     <div class="footer-links">
-      <a href="/auth.html?role=farmer">For Farmers</a>
-      <a href="/auth.html?role=consumer">For Buyers</a>
-      <a href="#contact">Contact</a>
+      <a href="/auth.html?role=farmer" data-i18n="for_farmers">For Farmers</a>
+      <a href="/auth.html?role=consumer" data-i18n="for_buyers">For Buyers</a>
+      <a href="#contact" data-i18n="contact">Contact</a>
     </div>
   </footer>
 </div>
@@ -99,6 +103,11 @@
 <div id="toast-stack"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+  const slot = document.getElementById('landing-lang-picker');
+  if (slot && window.KS_I18N) slot.innerHTML = KS_I18N.getSelectorHTML();
+});
+
 /* =====================================================================
    DATA LAYER — everything below is in-memory only, frontend demo state
    ===================================================================== */

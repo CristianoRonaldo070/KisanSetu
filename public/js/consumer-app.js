@@ -20,7 +20,27 @@ function toast(msg, icon) {
   setTimeout(() => { el.classList.add('leave'); setTimeout(() => el.remove(), 320); }, 2400);
 }
 
+const tr = (k, d) => window.KS_I18N ? KS_I18N.t(k, d) : (d || k);
+
 document.addEventListener('DOMContentLoaded', async () => {
+    const langSlot = document.getElementById('consumer-lang-slot');
+    if (langSlot && window.KS_I18N) langSlot.innerHTML = KS_I18N.getSelectorHTML();
+
+    window.addEventListener('ks_language_changed', () => {
+        const activeBtn = document.querySelector('.ctab.active');
+        const tab = activeBtn ? activeBtn.dataset.ctab : 'browse';
+        switch(tab) {
+            case 'browse': renderBrowseTab(); break;
+            case 'nearby': renderNearbyTab(); break;
+            case 'chat': renderChatTab(); break;
+            case 'profile': renderProfileTab(); break;
+        }
+        const cartDrawer = document.getElementById('cart-drawer');
+        if (cartDrawer && cartDrawer.classList.contains('open')) {
+            renderCart();
+        }
+    });
+
     setupNav();
     const authed = await KS_AUTH.requireAuth();
     if (!authed) return;
@@ -68,7 +88,7 @@ const contentEl = document.getElementById('consumer-content');
 
 async function renderBrowseTab() {
     const query = document.getElementById('consumer-search').value;
-    contentEl.innerHTML = '<div style="padding:20px;">Loading products...</div>';
+    contentEl.innerHTML = `<div style="padding:20px;">${tr('loading_products', 'Loading products...')}</div>`;
     try {
         let url = '/api/products';
         if(query) url += `?search=${encodeURIComponent(query)}`;
@@ -76,15 +96,17 @@ async function renderBrowseTab() {
         const products = await res.json();
         
         if(!products || products.length === 0) {
-            contentEl.innerHTML = '<div style="padding:20px;">No products found.</div>';
+            contentEl.innerHTML = `<div style="padding:20px;">${tr('no_products_found', 'No products found.')}</div>`;
             return;
         }
         
         consumerProductsMap = {};
         let html = '<div style="padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">';
         products.forEach(p => {
-            const stockBadge = p.stock > 0 ? `<span class="stock-badge in">In Stock</span>` : `<span class="stock-badge out">Out of Stock</span>`;
-            const farmerName = p.farmer?.full_name || 'Verified Farmer';
+            const stockBadge = p.stock > 0 
+                ? `<span class="stock-badge in">${tr('stat_in_stock', 'In Stock')}</span>` 
+                : `<span class="stock-badge out">${tr('stat_out_stock', 'Out of Stock')}</span>`;
+            const farmerName = p.farmer?.full_name || tr('verified_farmer', 'Verified Farmer');
             const statusDot = `<span class="status-dot ${p.farmer?.delivery_status || 'available'}"></span>`;
             consumerProductsMap[p.id] = { ...p, farmerName };
             const visual = (p.emoji && (p.emoji.startsWith('data:image') || p.emoji.startsWith('http')))
@@ -98,13 +120,13 @@ async function renderBrowseTab() {
                         ${stockBadge}
                     </div>
                     <h4>${p.name}</h4>
-                    <p class="lr-sub">₹${p.price}/${p.unit}</p>
+                    <p class="lr-sub">₹${p.price}/${tr('unit_' + p.unit, p.unit)}</p>
                     <div style="margin:10px 0; font-size:0.9rem; display:flex; align-items:center; gap:6px;">
                         ${statusDot} <span>${farmerName}</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}')" ${p.stock>0?'':'disabled'}>Add to Cart</button>
-                        <button class="btn btn-ghost" onclick="requestChatWithFarmer('${p.farmer_id}')">💬 Chat</button>
+                        <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}')" ${p.stock>0?'':'disabled'}>${tr('btn_add_to_cart', 'Add to Cart')}</button>
+                        <button class="btn btn-ghost" onclick="requestChatWithFarmer('${p.farmer_id}')">${tr('btn_chat_farmer', '💬 Chat')}</button>
                     </div>
                 </div>
             `;
@@ -118,14 +140,30 @@ async function renderBrowseTab() {
 
 async function requestChatWithFarmer(farmerId) {
     try {
+        const client = window.supabaseClient;
+        const user = await KS_AUTH.getUser();
+        if (client && user) {
+            const { error: directErr } = await client.from('chat_requests').insert({
+                from_user_id: user.id,
+                to_user_id: farmerId,
+                status: 'pending'
+            });
+            if (!directErr) {
+                toast('Chat request sent to farmer!');
+                if (typeof loadChatData === 'function') loadChatData();
+                return;
+            }
+        }
         const res = await KS_AUTH.apiFetch('/api/chat-requests', { method: 'POST', body: JSON.stringify({ to_user_id: farmerId }) });
-        if(res.ok) {
+        if(res && res.ok) {
             toast('Chat request sent to farmer!');
+            if (typeof loadChatData === 'function') loadChatData();
         } else {
-            toast('Could not send chat request', '❌');
+            const errData = res ? await res.json().catch(() => ({})) : {};
+            toast(errData.error || 'Could not send chat request', '❌');
         }
     } catch(e) {
-        toast('Error', '❌');
+        toast('Error: ' + e.message, '❌');
     }
 }
 
@@ -145,7 +183,7 @@ function addToCart(id, name, emoji, price, unit, farmerName) {
         cart.push({ product_id: id, name, emoji, price, unit, farmer_name: farmerName, qty: 1 });
     }
     updateCartCount();
-    toast(`${name} added to cart!`, '🛒');
+    toast(`${name} ${tr('added_to_cart', 'added to cart!')}`, '🛒');
 }
 
 function updateCartCount() {
@@ -173,7 +211,7 @@ function renderCart() {
     const foot = document.getElementById('cart-foot');
     
     if(cart.length === 0) {
-        body.innerHTML = '<p class="lr-sub" style="padding:20px;">Your cart is empty.</p>';
+        body.innerHTML = `<p class="lr-sub" style="padding:20px;">${tr('cart_empty', 'Your cart is empty.')}</p>`;
         foot.innerHTML = '';
         return;
     }
@@ -189,7 +227,7 @@ function renderCart() {
                     <span class="lr-icon">${renderCropVisual(item.emoji, item.name, 44)}</span>
                     <div>
                         <div class="lr-name">${item.name}</div>
-                        <div class="lr-sub">${item.farmer_name} • ₹${item.price}/${item.unit}</div>
+                        <div class="lr-sub">${item.farmer_name} • ₹${item.price}/${tr('unit_' + item.unit, item.unit)}</div>
                     </div>
                 </div>
                 <div style="display:flex; align-items:center; gap:10px;">
@@ -204,10 +242,10 @@ function renderCart() {
     body.innerHTML = html;
     foot.innerHTML = `
         <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:1.1rem; margin-bottom:15px;">
-            <span>Total:</span>
+            <span>${tr('cart_total', 'Total:')}</span>
             <span>₹${total}</span>
         </div>
-        <button class="btn btn-primary" style="width:100%;" onclick="checkout()">Checkout</button>
+        <button class="btn btn-primary" style="width:100%;" onclick="checkout()">${tr('btn_checkout', 'Place Order')}</button>
     `;
 }
 
@@ -229,7 +267,7 @@ async function checkout() {
             cart = [];
             updateCartCount();
             closeCart();
-            toast('Order placed successfully!', '✅');
+            toast(tr('order_success', 'Order placed successfully! 🎉'), '✅');
         } else {
             toast('Failed to place order', '❌');
         }
@@ -242,9 +280,9 @@ async function checkout() {
 async function renderNearbyTab() {
     contentEl.innerHTML = `
         <div style="padding:20px; max-width:600px; margin:0 auto;">
-            <h3>Find Nearby Farmers</h3>
+            <h3>${tr('nearby_title', 'Nearby Farmers')}</h3>
             <div class="panel" style="margin-bottom:20px; display:flex; gap:10px;">
-                <button class="btn btn-primary" onclick="findNearby()">📍 Use My Location</button>
+                <button class="btn btn-primary" onclick="findNearby()">${tr('btn_find_nearby', '📍 Find Farmers Near Me')}</button>
             </div>
             <div id="nearby-results"></div>
         </div>
@@ -257,18 +295,18 @@ function findNearby() {
         return;
     }
     const resEl = document.getElementById('nearby-results');
-    resEl.innerHTML = '<p>Getting your location...</p>';
+    resEl.innerHTML = `<p>${tr('getting_location', 'Getting your location...')}</p>`;
     
     navigator.geolocation.getCurrentPosition(async pos => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        resEl.innerHTML = '<p>Searching farmers nearby...</p>';
+        resEl.innerHTML = `<p>${tr('searching_nearby', 'Searching farmers nearby...')}</p>`;
         try {
             const res = await KS_AUTH.apiFetch(`/api/farmers/nearby?lat=${lat}&lng=${lng}&radius=10`);
             const farmers = await res.json();
             
             if(!farmers || farmers.length === 0) {
-                resEl.innerHTML = '<p>No farmers found nearby.</p>';
+                resEl.innerHTML = `<p>${tr('no_farmers_found', 'No farmers found nearby.')}</p>`;
                 return;
             }
             
@@ -278,13 +316,13 @@ function findNearby() {
                 html += `
                     <div class="panel nearby-card" style="display:flex; justify-content:space-between; align-items:center;">
                         <div class="nc-top" style="display:flex; gap:15px; align-items:center;">
-                            <div class="nc-avatar" style="font-size:2rem;">🧑🌾</div>
+                            <div class="nc-avatar" style="font-size:2rem;">🧑‍🌾</div>
                             <div>
                                 <div style="font-weight:bold;">${statusDot} ${f.full_name}</div>
                                 <div class="lr-sub nc-distance">${f.city || 'Unknown City'}</div>
                             </div>
                         </div>
-                        <button class="btn btn-water" onclick="requestChatWithFarmer('${f.id}')">Send Chat Request</button>
+                        <button class="btn btn-water" onclick="requestChatWithFarmer('${f.id}')">${tr('btn_send_request', 'Send Request')}</button>
                     </div>
                 `;
             });
@@ -304,20 +342,20 @@ async function renderChatTab() {
         <div style="padding:20px;">
             <div class="user-search-wrap" style="margin-bottom:20px; max-width:600px;">
                 <div style="display:flex; gap:10px;">
-                    <input type="text" class="plain" id="user-search-input" placeholder="Search for farmers..." onkeydown="if(event.key==='Enter')searchUsers()">
-                    <button class="btn btn-primary" onclick="searchUsers()">Search</button>
+                    <input type="text" class="plain" id="user-search-input" placeholder="${tr('search_placeholder_farmer', 'Search for farmers...')}" onkeydown="if(event.key==='Enter')searchUsers()">
+                    <button class="btn btn-primary" onclick="searchUsers()">${tr('btn_search', 'Search')}</button>
                 </div>
                 <div id="user-search-results" class="search-results" style="margin-top:10px; display:grid; gap:10px;"></div>
             </div>
             
             <div style="display:flex; gap:20px; flex-wrap:wrap;">
                 <div style="flex:1; min-width:300px;">
-                    <h3>Pending Requests</h3>
-                    <div id="pending-requests" class="requests-grid" style="display:grid; gap:10px; margin-top:10px;">Loading...</div>
+                    <h3>${tr('pending_requests', 'Pending Requests')}</h3>
+                    <div id="pending-requests" class="requests-grid" style="display:grid; gap:10px; margin-top:10px;">${tr('loading', 'Loading...')}</div>
                 </div>
                 <div style="flex:1; min-width:300px;">
-                    <h3>Active Conversations</h3>
-                    <div id="active-conversations" style="display:grid; gap:10px; margin-top:10px;">Loading...</div>
+                    <h3>${tr('active_convs', 'Active Conversations')}</h3>
+                    <div id="active-conversations" style="display:grid; gap:10px; margin-top:10px;">${tr('loading', 'Loading...')}</div>
                 </div>
             </div>
         </div>
@@ -329,13 +367,13 @@ async function searchUsers() {
     const q = document.getElementById('user-search-input').value;
     if(!q) return;
     const resEl = document.getElementById('user-search-results');
-    resEl.innerHTML = '<p>Searching...</p>';
+    resEl.innerHTML = `<p>${tr('searching', 'Searching...')}</p>`;
     try {
         const res = await KS_AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}&role=farmer`);
         const users = await res.json();
         
         if(!users || users.length === 0) {
-            resEl.innerHTML = '<p class="lr-sub">No farmers found.</p>';
+            resEl.innerHTML = `<p class="lr-sub">${tr('no_farmers_found', 'No farmers found.')}</p>`;
             return;
         }
         
@@ -344,13 +382,13 @@ async function searchUsers() {
             html += `
                 <div class="panel user-result" style="display:flex; justify-content:space-between; align-items:center; padding:10px;">
                     <div class="ur-left" style="display:flex; align-items:center; gap:10px;">
-                        <div class="ur-avatar" style="font-size:1.5rem;">🧑🌾</div>
+                        <div class="ur-avatar" style="font-size:1.5rem;">🧑‍🌾</div>
                         <div>
                             <div style="font-weight:bold;">${u.full_name || 'Unknown'}</div>
-                            <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${u.role}</div>
+                            <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${tr('role_farmer', 'Farmer')}</div>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-water" onclick="requestChatWithFarmer('${u.id}')">Send Request</button>
+                    <button class="btn btn-sm btn-water" onclick="requestChatWithFarmer('${u.id}')">${tr('btn_send_request', 'Send Request')}</button>
                 </div>
             `;
         });
@@ -381,10 +419,10 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div><strong>${r.other_user.full_name}</strong> sent a request</div>
+                                    <div><strong>${r.other_user.full_name}</strong> ${tr('sent_req_text', 'sent a request')}</div>
                                     <div style="display:flex; gap:5px;">
-                                        <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">Accept</button>
-                                        <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">Decline</button>
+                                        <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">${tr('btn_accept', 'Accept')}</button>
+                                        <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">${tr('btn_decline', 'Decline')}</button>
                                     </div>
                                 </div>
                             </div>
@@ -393,15 +431,15 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div>You requested to chat with <strong>${r.other_user.full_name}</strong></div>
-                                    <div class="lr-sub">Pending</div>
+                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${r.other_user.full_name}</strong></div>
+                                    <div class="lr-sub">${tr('stat_pending', 'Pending')}</div>
                                 </div>
                             </div>
                         `;
                     }
                 }
             });
-            pendingEl.innerHTML = reqHtml || '<p class="lr-sub">No pending requests.</p>';
+            pendingEl.innerHTML = reqHtml || `<p class="lr-sub">${tr('no_pending_req', 'No pending requests.')}</p>`;
         }
         
         if(activeEl) {
@@ -410,12 +448,12 @@ async function loadChatData() {
                 const other = c.other_user;
                 convHtml += `
                     <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:10px;" onclick="openChat('${c.id}', '${other.id}', '${other.full_name}')">
-                        <div style="font-size:1.5rem;">🧑🌾</div>
+                        <div style="font-size:1.5rem;">🧑‍🌾</div>
                         <div style="font-weight:bold;">${other.full_name}</div>
                     </div>
                 `;
             });
-            activeEl.innerHTML = convHtml || '<p class="lr-sub">No active conversations.</p>';
+            activeEl.innerHTML = convHtml || `<p class="lr-sub">${tr('no_active_conv', 'No active conversations.')}</p>`;
         }
         
     } catch(e) {
@@ -439,7 +477,7 @@ async function respondReq(id, status) {
 
 // Profile Tab Logic
 async function renderProfileTab() {
-    contentEl.innerHTML = '<div style="padding:20px;">Loading profile...</div>';
+    contentEl.innerHTML = `<div style="padding:20px;">${tr('loading', 'Loading profile...')}</div>`;
     try {
         let profile = await KS_AUTH.getProfile();
         const user = await KS_AUTH.getUser();
@@ -465,28 +503,28 @@ async function renderProfileTab() {
             <div style="padding:20px; max-width:620px; margin:0 auto;">
                 <div class="panel">
                     <div style="display:flex; gap:20px; align-items:center; margin-bottom:24px;">
-                        <div style="cursor:pointer; position:relative;" title="Click to upload profile photo" onclick="document.getElementById('photo-upload').click()">
+                        <div style="cursor:pointer; position:relative;" title="${tr('change_photo', 'Change')}" onclick="document.getElementById('photo-upload').click()">
                             ${avatarDisplay}
                             <div style="position:absolute; bottom:0; right:0; background:var(--water); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:bold; border:2px solid #161f14;">📷</div>
                         </div>
                         <input type="file" id="photo-upload" style="display:none;" onchange="uploadPhoto(this)" accept="image/*">
                         <div>
                             <h3 id="consumer-heading-name">${profile.full_name || 'Consumer'}</h3>
-                            <div class="lr-sub">Set your name and location to find nearby farmers and chat directly.</div>
+                            <div class="lr-sub">${tr('profile_sub_consumer', 'Set your name and location to find nearby farmers and chat directly.')}</div>
                         </div>
                     </div>
                     
                     <div class="form-grid">
-                        <div class="form-field"><label>Full Name *</label><input type="text" class="plain" id="p-name" value="${profile.full_name||''}" placeholder="e.g. Priya Sharma"></div>
-                        <div class="form-field"><label>Phone Number</label><input type="text" class="plain" id="p-phone" value="${profile.phone||''}" placeholder="e.g. 9876543210"></div>
-                        <div class="form-field" style="grid-column:1/-1;"><label>Delivery Address</label><input type="text" class="plain" id="p-addr" value="${profile.address||''}" placeholder="e.g. Flat 301, Sunshine Apts"></div>
-                        <div class="form-field"><label>City</label><input type="text" class="plain" id="p-city" value="${profile.city||''}" placeholder="e.g. Mumbai"></div>
-                        <div class="form-field"><label>State</label><input type="text" class="plain" id="p-state" value="${profile.state_province||''}" placeholder="e.g. Maharashtra"></div>
+                        <div class="form-field"><label>${tr('label_name', 'Full Name')} *</label><input type="text" class="plain" id="p-name" value="${profile.full_name||''}" placeholder="${tr('placeholder_name', 'e.g. Priya Sharma')}"></div>
+                        <div class="form-field"><label>${tr('profile_phone', 'Phone Number')}</label><input type="text" class="plain" id="p-phone" value="${profile.phone||''}" placeholder="e.g. 9876543210"></div>
+                        <div class="form-field" style="grid-column:1/-1;"><label>${tr('delivery_address_label', 'Delivery Address')}</label><input type="text" class="plain" id="p-addr" value="${profile.address||''}" placeholder="e.g. Flat 301, Sunshine Apts"></div>
+                        <div class="form-field"><label>${tr('profile_city', 'City / Town')}</label><input type="text" class="plain" id="p-city" value="${profile.city||''}" placeholder="e.g. Mumbai"></div>
+                        <div class="form-field"><label>${tr('profile_state', 'State / Province')}</label><input type="text" class="plain" id="p-state" value="${profile.state_province||''}" placeholder="e.g. Maharashtra"></div>
                     </div>
                     
                     <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
-                        <button class="btn btn-ghost" onclick="useLocation()">📍 Use Current GPS Location</button>
-                        <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+                        <button class="btn btn-ghost" onclick="useLocation()">${tr('btn_location', '📍 Use Current GPS Location')}</button>
+                        <button class="btn btn-primary" onclick="saveProfile()">${tr('btn_save_profile', 'Save Profile')}</button>
                     </div>
                     <input type="hidden" id="p-lat" value="${profile.latitude||''}">
                     <input type="hidden" id="p-lng" value="${profile.longitude||''}">
@@ -566,7 +604,7 @@ async function saveProfile() {
         await KS_AUTH.apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(data) });
         
         document.getElementById('consumer-name').textContent = name;
-        toast('Profile saved successfully! 🎉');
+        toast(tr('save_profile_success', 'Profile saved successfully! 🎉'));
         renderProfileTab();
     } catch(e) {
         console.error('Save profile error:', e);

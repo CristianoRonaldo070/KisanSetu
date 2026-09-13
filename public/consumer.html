@@ -8,15 +8,17 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js"></script>
 </head>
 <body style="display:flex; flex-direction:column; height:100vh; overflow:hidden;">
   <!-- Top bar -->
   <div style="display:flex; align-items:center; justify-content:space-between; padding:18px 32px; border-bottom:1px solid #232f1c;">
-    <div class="brand"><span class="dot"></span>KisanSetu</div>
-    <div style="display:flex; gap:10px; align-items:center;">
+    <div class="brand"><span class="dot"></span><span data-i18n="brand_name">KisanSetu</span></div>
+    <div style="display:flex; gap:12px; align-items:center;">
+      <div id="consumer-lang-slot"></div>
       <span id="consumer-name" style="font-size:.88rem; font-weight:600;"></span>
-      <button class="exit-btn" style="color:var(--leaf-bright); border-color:#324428;" onclick="KS_AUTH.switchRole('farmer')">🧑‍🌾 Switch to Farmer</button>
-      <button class="exit-btn" onclick="KS_AUTH.signOut()">🚪 Sign Out</button>
+      <button class="exit-btn" style="color:var(--leaf-bright); border-color:#324428;" onclick="KS_AUTH.switchRole('farmer')" data-i18n="switch_to_farmer">🧑‍🌾 Switch to Farmer</button>
+      <button class="exit-btn" onclick="KS_AUTH.signOut()" data-i18n="sign_out">🚪 Sign Out</button>
     </div>
   </div>
   
@@ -24,15 +26,15 @@
   <header class="consumer-top">
     <div class="search-wrap">
       <span>🔍</span>
-      <input type="text" id="consumer-search" placeholder="Search crops, farmers…" oninput="handleSearch()">
+      <input type="text" id="consumer-search" placeholder="Search crops, farmers…" data-i18n-placeholder="search_crops_placeholder" oninput="handleSearch()">
     </div>
     <div class="consumer-tabs" id="consumer-tabs">
-      <button class="ctab active" data-ctab="browse">🛒 Browse</button>
-      <button class="ctab" data-ctab="nearby">📍 Nearby</button>
-      <button class="ctab" data-ctab="chat">💬 Chat</button>
-      <button class="ctab" data-ctab="profile">👤 Profile</button>
+      <button class="ctab active" data-ctab="browse"><span class="ic">🛒</span><span data-i18n="tab_browse">Browse</span></button>
+      <button class="ctab" data-ctab="nearby"><span class="ic">📍</span><span data-i18n="tab_nearby">Nearby</span></button>
+      <button class="ctab" data-ctab="chat"><span class="ic">💬</span><span data-i18n="tab_chat">Chat</span></button>
+      <button class="ctab" data-ctab="profile"><span class="ic">👤</span><span data-i18n="tab_profile">Profile</span></button>
     </div>
-    <button class="btn btn-ghost cart-fab" onclick="openCart()">🛍️ Cart <span class="cart-count hidden" id="cart-count">0</span></button>
+    <button class="btn btn-ghost cart-fab" onclick="openCart()"><span class="ic">🛍️</span><span data-i18n="tab_cart">Cart</span> <span class="cart-count hidden" id="cart-count">0</span></button>
   </header>
   
   <!-- Main content -->
@@ -40,7 +42,7 @@
   
   <!-- Cart Drawer -->
   <div class="drawer" id="cart-drawer">
-    <div class="drawer-head"><h3 style="font-size:1.1rem;">Your cart</h3><button class="drawer-close" onclick="closeCart()">✕</button></div>
+    <div class="drawer-head"><h3 style="font-size:1.1rem;" data-i18n="cart_title">Your cart</h3><button class="drawer-close" onclick="closeCart()">✕</button></div>
     <div class="drawer-body" id="cart-body"></div>
     <div class="drawer-foot" id="cart-foot"></div>
   </div>
@@ -48,14 +50,14 @@
   <!-- Chat Drawer -->
   <div class="drawer" id="chat-drawer">
     <div class="drawer-head">
-      <div class="chat-header-info"><span id="chat-avatar">👤</span><div><div style="font-weight:700; font-size:.9rem;" id="chat-name">User</div><div class="lr-sub" id="chat-status">Online</div></div></div>
+      <div class="chat-header-info"><span id="chat-avatar">👤</span><div><div style="font-weight:700; font-size:.9rem;" id="chat-name">User</div><div class="lr-sub" id="chat-status" data-i18n="online">Online</div></div></div>
       <button class="drawer-close" onclick="closeChat()">✕</button>
     </div>
     <div class="drawer-body"><div class="chat-msgs" id="chat-msgs"></div></div>
     <div class="drawer-foot">
       <div class="chat-input-row">
-        <input type="text" class="plain" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChatMessage()">
-        <button class="btn btn-water btn-sm" onclick="sendChatMessage()">Send</button>
+        <input type="text" class="plain" id="chat-input" placeholder="Type a message…" data-i18n-placeholder="chat_placeholder" onkeydown="if(event.key==='Enter')sendChatMessage()">
+        <button class="btn btn-water btn-sm" onclick="sendChatMessage()" data-i18n="btn_send">Send</button>
       </div>
     </div>
   </div>

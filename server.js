@@ -274,7 +274,8 @@ app.get('/api/users/search', authMiddleware, async (req, res) => {
 // --- Chat Requests Routes ---
 app.get('/api/chat-requests', authMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('chat_requests')
+    const client = getUserClient(req);
+    const { data, error } = await client.from('chat_requests')
       .select('*, from_user:profiles!chat_requests_from_user_id_fkey(id, full_name, avatar_url), to_user:profiles!chat_requests_to_user_id_fkey(id, full_name, avatar_url)')
       .or(`from_user_id.eq.${req.user.id},to_user_id.eq.${req.user.id}`);
     if (error) throw error;
@@ -287,7 +288,8 @@ app.get('/api/chat-requests', authMiddleware, async (req, res) => {
 app.post('/api/chat-requests', authMiddleware, async (req, res) => {
   try {
     const { to_user_id } = req.body;
-    const { data, error } = await supabase.from('chat_requests')
+    const client = getUserClient(req);
+    const { data, error } = await client.from('chat_requests')
       .insert({ from_user_id: req.user.id, to_user_id, status: 'pending' })
       .select().single();
     if (error) throw error;
@@ -295,6 +297,7 @@ app.post('/api/chat-requests', authMiddleware, async (req, res) => {
     io.to(`user_${to_user_id}`).emit('new_chat_request', data);
     res.status(201).json(data);
   } catch (err) {
+    console.error('POST /api/chat-requests error:', err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -302,7 +305,8 @@ app.post('/api/chat-requests', authMiddleware, async (req, res) => {
 app.put('/api/chat-requests/:id', authMiddleware, async (req, res) => {
   try {
     const { status } = req.body;
-    const { data, error } = await supabase.from('chat_requests')
+    const client = getUserClient(req);
+    const { data, error } = await client.from('chat_requests')
       .update({ status })
       .eq('id', req.params.id)
       .eq('to_user_id', req.user.id)
@@ -320,7 +324,8 @@ app.put('/api/chat-requests/:id', authMiddleware, async (req, res) => {
 // --- Conversations Routes ---
 app.get('/api/conversations', authMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('conversations')
+    const client = getUserClient(req);
+    const { data, error } = await client.from('conversations')
       .select('*, user_one_profile:profiles!conversations_user_one_fkey(id, full_name, avatar_url), user_two_profile:profiles!conversations_user_two_fkey(id, full_name, avatar_url)')
       .or(`user_one.eq.${req.user.id},user_two.eq.${req.user.id}`);
     if (error) throw error;
@@ -332,8 +337,9 @@ app.get('/api/conversations', authMiddleware, async (req, res) => {
 
 app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
   try {
+    const client = getUserClient(req);
     // Verify participant
-    const { data: conv, error: convError } = await supabase.from('conversations')
+    const { data: conv, error: convError } = await client.from('conversations')
       .select('*')
       .eq('id', req.params.id)
       .single();
@@ -341,7 +347,7 @@ app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
     
-    const { data, error } = await supabase.from('messages')
+    const { data, error } = await client.from('messages')
       .select('*')
       .eq('conversation_id', req.params.id)
       .order('created_at', { ascending: true });
@@ -358,24 +364,25 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
     const { items } = req.body; // [{ product_id, quantity }]
     if (!items || !items.length) return res.status(400).json({ error: 'Items required' });
     
+    const client = getUserClient(req);
     let total = 0;
     const orderItemsData = [];
     
     for (const item of items) {
-      const { data: product } = await supabase.from('products').select('price').eq('id', item.product_id).single();
+      const { data: product } = await client.from('products').select('price').eq('id', item.product_id).single();
       if (product) {
         total += product.price * item.quantity;
         orderItemsData.push({ product_id: item.product_id, quantity: item.quantity, unit_price: product.price });
       }
     }
     
-    const { data: order, error: orderError } = await supabase.from('orders')
+    const { data: order, error: orderError } = await client.from('orders')
       .insert({ consumer_id: req.user.id, total_amount: total })
       .select().single();
     if (orderError) throw orderError;
     
     const itemsToInsert = orderItemsData.map(i => ({ ...i, order_id: order.id }));
-    const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
+    const { error: itemsError } = await client.from('order_items').insert(itemsToInsert);
     if (itemsError) throw itemsError;
     
     res.status(201).json(order);

@@ -8,23 +8,24 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/i18n.js"></script>
 </head>
 <body style="display:flex; height:100vh; overflow:hidden;">
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="brand"><span class="dot"></span>KisanSetu</div>
+    <div class="brand"><span class="dot"></span><span data-i18n="brand_name">KisanSetu</span></div>
     <div class="side-nav" id="farmer-nav">
-      <button data-tab="products" class="active"><span class="ic">🌱</span>Products</button>
-      <button data-tab="revenue"><span class="ic">📈</span>Revenue</button>
-      <button data-tab="stock"><span class="ic">📦</span>Stock</button>
-      <button data-tab="delivery"><span class="ic">🚚</span>Delivery</button>
-      <button data-tab="chat-requests"><span class="ic">💬</span>Chat</button>
-      <button data-tab="profile"><span class="ic">👤</span>Profile</button>
+      <button data-tab="products" class="active"><span class="ic">🌱</span><span data-i18n="tab_products">Products</span></button>
+      <button data-tab="revenue"><span class="ic">📈</span><span data-i18n="tab_revenue">Revenue</span></button>
+      <button data-tab="stock"><span class="ic">📦</span><span data-i18n="tab_stock">Stock</span></button>
+      <button data-tab="delivery"><span class="ic">🚚</span><span data-i18n="tab_delivery">Delivery</span></button>
+      <button data-tab="chat-requests"><span class="ic">💬</span><span data-i18n="tab_chat">Chat</span></button>
+      <button data-tab="profile"><span class="ic">👤</span><span data-i18n="tab_profile">Profile</span></button>
     </div>
     <div class="sidebar-foot">
-      <div class="role-pill"><span class="avatar" id="farmer-avatar-pill">🧑🌾</span><span id="farmer-name-pill">Farmer</span></div>
-      <button class="exit-btn" style="margin-bottom:6px; color:var(--water-bright); border-color:#2e4438;" onclick="KS_AUTH.switchRole('consumer')">🛒 Switch to Buyer</button>
-      <button class="exit-btn" onclick="KS_AUTH.signOut()">🚪 Sign Out</button>
+      <div class="role-pill"><span class="avatar" id="farmer-avatar-pill">🧑‍🌾</span><span id="farmer-name-pill" data-i18n="role_farmer">Farmer</span></div>
+      <button class="exit-btn" style="margin-bottom:6px; color:var(--water-bright); border-color:#2e4438;" onclick="KS_AUTH.switchRole('consumer')" data-i18n="switch_to_buyer">🛒 Switch to Buyer</button>
+      <button class="exit-btn" onclick="KS_AUTH.signOut()" data-i18n="sign_out">🚪 Sign Out</button>
     </div>
   </aside>
   
@@ -32,10 +33,13 @@
   <div class="main-col">
     <header class="topheader">
       <div>
-        <h2 id="farmer-tab-title">Your Products</h2>
-        <div class="sub" id="farmer-tab-sub">Add crops, tweak prices, retire what's sold out.</div>
+        <h2 id="farmer-tab-title" data-i18n="head_products_title">Your Products</h2>
+        <div class="sub" id="farmer-tab-sub" data-i18n="head_products_sub">Add crops, tweak prices, retire what's sold out.</div>
       </div>
-      <button class="btn btn-primary" id="add-product-btn" onclick="openProductModal()">+ Add a crop</button>
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div id="farmer-lang-slot"></div>
+        <button class="btn btn-primary" id="add-product-btn" onclick="openProductModal()" data-i18n="btn_add_crop">+ Add a crop</button>
+      </div>
     </header>
     <div class="main-scroll" id="farmer-content"></div>
   </div>
@@ -43,17 +47,37 @@
   <!-- Product Modal -->
   <div class="modal-back" id="product-modal">
     <div class="modal-box">
-      <h3 id="modal-title">Add a crop</h3>
+      <h3 id="modal-title" data-i18n="modal_title_add">Add a crop</h3>
       <input type="hidden" id="edit-product-id">
       <div class="form-grid">
-        <div class="form-field" style="grid-column:1/-1;"><label>Crop name</label><input type="text" class="plain" id="f-name" placeholder="e.g. Alphonso Mangoes"></div>
-        <div class="form-field"><label>Category</label><select class="plain" id="f-category"><option>Vegetable</option><option>Fruit</option><option>Grain</option><option>Spice</option><option>Dairy</option></select></div>
-        <div class="form-field"><label>Unit</label><select class="plain" id="f-unit"><option>kg</option><option>pc</option><option>dozen</option><option>litre</option></select></div>
-        <div class="form-field"><label>Your price (₹)</label><input type="number" class="plain" id="f-price" min="0" placeholder="e.g. 40"></div>
-        <div class="form-field"><label>Cost to grow (₹)</label><input type="number" class="plain" id="f-cost" min="0" placeholder="e.g. 22"></div>
-        <div class="form-field"><label>Stock available</label><input type="number" class="plain" id="f-stock" min="0" placeholder="e.g. 60"></div>
         <div class="form-field" style="grid-column:1/-1;">
-          <label>Crop Photo (Optional)</label>
+          <label data-i18n="field_crop_name">Crop name</label>
+          <input type="text" class="plain" id="f-name" placeholder="e.g. Alphonso Mangoes" data-i18n-placeholder="placeholder_crop_name">
+        </div>
+        <div class="form-field">
+          <label data-i18n="field_category">Category</label>
+          <select class="plain" id="f-category">
+            <option value="Vegetable" data-i18n="cat_vegetable">Vegetable</option>
+            <option value="Fruit" data-i18n="cat_fruit">Fruit</option>
+            <option value="Grain" data-i18n="cat_grain">Grain</option>
+            <option value="Spice" data-i18n="cat_spice">Spice</option>
+            <option value="Dairy" data-i18n="cat_dairy">Dairy</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label data-i18n="field_unit">Unit</label>
+          <select class="plain" id="f-unit">
+            <option value="kg" data-i18n="unit_kg">kg</option>
+            <option value="pc" data-i18n="unit_pc">pc</option>
+            <option value="dozen" data-i18n="unit_dozen">dozen</option>
+            <option value="litre" data-i18n="unit_litre">litre</option>
+          </select>
+        </div>
+        <div class="form-field"><label data-i18n="field_price">Your price (₹)</label><input type="number" class="plain" id="f-price" min="0" placeholder="e.g. 40"></div>
+        <div class="form-field"><label data-i18n="field_cost">Cost to grow (₹)</label><input type="number" class="plain" id="f-cost" min="0" placeholder="e.g. 22"></div>
+        <div class="form-field"><label data-i18n="field_stock">Stock available</label><input type="number" class="plain" id="f-stock" min="0" placeholder="e.g. 60"></div>
+        <div class="form-field" style="grid-column:1/-1;">
+          <label data-i18n="field_crop_photo">Crop Photo (Optional)</label>
           <div style="display:flex; gap:12px; align-items:center;">
             <div id="crop-img-preview" style="width:48px; height:48px; border-radius:10px; background:#161f13; border:1px dashed #3a4a32; display:flex; align-items:center; justify-content:center; font-size:1.8rem; overflow:hidden; flex-shrink:0;">🌱</div>
             <input type="file" id="f-image-file" class="plain" accept="image/*" onchange="previewCropImage(this)" style="padding:8px 12px; font-size:.8rem;">
@@ -61,8 +85,8 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveProduct()">Save crop</button>
+        <button class="btn btn-ghost" onclick="closeProductModal()" data-i18n="btn_cancel">Cancel</button>
+        <button class="btn btn-primary" onclick="saveProduct()" data-i18n="btn_save_crop">Save crop</button>
       </div>
     </div>
   </div>
@@ -76,8 +100,8 @@
     <div class="drawer-body"><div class="chat-msgs" id="chat-msgs"></div></div>
     <div class="drawer-foot">
       <div class="chat-input-row">
-        <input type="text" class="plain" id="chat-input" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChatMessage()">
-        <button class="btn btn-water btn-sm" onclick="sendChatMessage()">Send</button>
+        <input type="text" class="plain" id="chat-input" placeholder="Type a message…" data-i18n-placeholder="chat_placeholder" onkeydown="if(event.key==='Enter')sendChatMessage()">
+        <button class="btn btn-water btn-sm" onclick="sendChatMessage()" data-i18n="btn_send">Send</button>
       </div>
     </div>
   </div>
