@@ -919,72 +919,234 @@ async function saveProfile() {
 
 // Chat Drawer Logic
 let activeConversationId = null;
+let activeChatOtherUser = { id: null, name: 'User' };
+let activeChatCurrentUserId = null;
+let renderedMessageIds = new Set();
+let lastRenderedDateKey = null;
+let chatPollingTimer = null;
+
+function escapeChatHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[m]);
+}
+
+function formatChatTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function getChatDateKey(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toDateString();
+}
+
+function formatChatDateHeader(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return '';
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) {
+        return tr('today', 'Today');
+    } else if (d.toDateString() === yesterday.toDateString()) {
+        return tr('yesterday', 'Yesterday');
+    } else {
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+}
+
+function renderMessageHtml(msg, isMe, otherName) {
+    const msgDateKey = getChatDateKey(msg.created_at);
+    let separatorHtml = '';
+    if (msgDateKey && msgDateKey !== lastRenderedDateKey) {
+        separatorHtml = `<div class="chat-date-separator"><span>${formatChatDateHeader(msg.created_at)}</span></div>`;
+        lastRenderedDateKey = msgDateKey;
+    }
+    
+    const senderName = isMe ? tr('you', 'You') : escapeChatHtml(otherName || 'User');
+    const timeStr = formatChatTime(msg.created_at || new Date().toISOString());
+    const rowId = msg.id ? `msg-row-${msg.id}` : `msg-row-temp-${Math.random().toString(36).substring(2)}`;
+    
+    return `${separatorHtml}
+    <div class="chat-msg-row ${isMe ? 'me' : 'them'}" id="${rowId}">
+        <div class="chat-msg-bubble ${isMe ? 'me' : 'them'}">
+            <div class="chat-msg-header">
+                <span class="chat-msg-author">${senderName}</span>
+                <span class="chat-msg-time">${timeStr}</span>
+            </div>
+            <div class="chat-msg-text">${escapeChatHtml(msg.content)}</div>
+        </div>
+    </div>`;
+}
+
+function appendSingleMessage(msg, isMe, otherName) {
+    if (msg.id && renderedMessageIds.has(msg.id)) return;
+    if (msg.id) renderedMessageIds.add(msg.id);
+    
+    const msgsEl = document.getElementById('chat-msgs');
+    if (!msgsEl) return;
+    
+    const emptyNotice = msgsEl.querySelector('.chat-empty-notice');
+    if (emptyNotice) emptyNotice.remove();
+    
+    msgsEl.insertAdjacentHTML('beforeend', renderMessageHtml(msg, isMe, otherName));
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function fetchAndRenderChatMessages(convId, isBackground = false) {
+    if (!convId || convId !== activeConversationId) return;
+    const msgsEl = document.getElementById('chat-msgs');
+    if (!msgsEl) return;
+    
+    try {
+        let msgs = [];
+        try {
+            const res = await KS_AUTH.apiFetch(`/api/conversations/${convId}/messages`);
+            if (res && res.ok) {
+                msgs = await res.json();
+            }
+        } catch (e) {
+            console.warn('apiFetch messages note:', e);
+        }
+        
+        if ((!msgs || msgs.length === 0) && window.supabaseClient) {
+            try {
+                const { data } = await window.supabaseClient.from('messages')
+                    .select('*')
+                    .eq('conversation_id', convId)
+                    .order('created_at', { ascending: true });
+                if (data) msgs = data;
+            } catch (dbErr) {
+                console.warn('Direct supabase messages query note:', dbErr);
+            }
+        }
+        
+        if (!Array.isArray(msgs)) msgs = [];
+        
+        if (!isBackground) {
+            msgsEl.innerHTML = '';
+            renderedMessageIds = new Set();
+            lastRenderedDateKey = null;
+            
+            if (msgs.length === 0) {
+                msgsEl.innerHTML = `<div class="chat-empty-notice" style="text-align:center; padding:35px 20px; color:var(--cream-dim);"><span style="font-size:2.2rem; display:block; margin-bottom:8px;">💬</span>${tr('no_messages_yet', 'No messages yet. Say hello!')}</div>`;
+                return;
+            }
+        }
+        
+        msgs.forEach(m => {
+            const isMe = m.sender_id === activeChatCurrentUserId;
+            appendSingleMessage(m, isMe, activeChatOtherUser.name);
+        });
+    } catch(err) {
+        console.error('fetchAndRenderChatMessages error:', err);
+        if (!isBackground) {
+            msgsEl.innerHTML = `<p style="color:var(--danger); text-align:center; padding:20px;">Error loading messages.</p>`;
+        }
+    }
+}
 
 async function openChat(convId, otherId, otherName) {
     activeConversationId = convId;
-    document.getElementById('chat-drawer').classList.add('open');
-    document.getElementById('chat-name').textContent = otherName;
+    activeChatOtherUser = { id: otherId, name: otherName || 'User' };
     
-    KS_CHAT.joinConversation(convId);
+    const user = await KS_AUTH.getUser();
+    activeChatCurrentUserId = user ? user.id : null;
+    
+    document.getElementById('chat-drawer').classList.add('open');
+    document.getElementById('chat-name').textContent = otherName || 'User';
     
     const msgsEl = document.getElementById('chat-msgs');
-    msgsEl.innerHTML = '<p>Loading...</p>';
+    msgsEl.innerHTML = `<div style="text-align:center; padding:25px; color:var(--cream-dim);">${tr('loading', 'Loading messages...')}</div>`;
     
-    try {
-        const res = await KS_AUTH.apiFetch(`/api/conversations/${convId}/messages`);
-        const msgs = await res.json();
-        
-        const user = await KS_AUTH.getUser();
-        let html = '';
-        msgs.forEach(m => {
-            const isMe = m.sender_id === user.id;
-            html += `<div style="margin-bottom:10px; text-align:${isMe?'right':'left'}">
-                <div style="display:inline-block; padding:8px 12px; border-radius:12px; background:${isMe?'var(--leaf-bright)':'var(--soil-panel-2)'}; color:${isMe?'#000':'#fff'}">
-                    ${m.content}
-                </div>
-            </div>`;
+    if (chatPollingTimer) clearInterval(chatPollingTimer);
+    
+    // Subscribe to Supabase Realtime changes for this conversation
+    if (window.KS_CHAT) {
+        KS_CHAT.subscribeConversation(convId, (newMsg) => {
+            if (newMsg.conversation_id === activeConversationId) {
+                const isMe = newMsg.sender_id === activeChatCurrentUserId;
+                appendSingleMessage(newMsg, isMe, activeChatOtherUser.name);
+            }
         });
-        msgsEl.innerHTML = html;
-        msgsEl.scrollTop = msgsEl.scrollHeight;
-    } catch(e) {
-        msgsEl.innerHTML = '<p>Error loading messages.</p>';
     }
+    
+    await fetchAndRenderChatMessages(convId, false);
+    
+    // 2-second polling guarantees delivery even if WebSockets are unmaintained on serverless
+    chatPollingTimer = setInterval(() => {
+        if (activeConversationId === convId) {
+            fetchAndRenderChatMessages(convId, true);
+        }
+    }, 2000);
 }
 
 function closeChat() {
     document.getElementById('chat-drawer').classList.remove('open');
+    if (chatPollingTimer) {
+        clearInterval(chatPollingTimer);
+        chatPollingTimer = null;
+    }
+    if (window.KS_CHAT) {
+        KS_CHAT.unsubscribeConversation();
+    }
     activeConversationId = null;
+    renderedMessageIds.clear();
+    lastRenderedDateKey = null;
 }
 
 async function sendChatMessage() {
-    if(!activeConversationId) return;
+    if (!activeConversationId) return;
     const input = document.getElementById('chat-input');
     const txt = input.value.trim();
-    if(!txt) return;
-    
-    KS_CHAT.sendMessage(activeConversationId, txt);
-    
-    const msgsEl = document.getElementById('chat-msgs');
-    msgsEl.innerHTML += `<div style="margin-bottom:10px; text-align:right">
-        <div style="display:inline-block; padding:8px 12px; border-radius:12px; background:var(--leaf-bright); color:#000">
-            ${txt}
-        </div>
-    </div>`;
-    msgsEl.scrollTop = msgsEl.scrollHeight;
+    if (!txt) return;
     
     input.value = '';
+    
+    // Immediate optimistic display on right side
+    const tempId = 'optimistic_' + Date.now();
+    const optimisticMsg = {
+        id: tempId,
+        conversation_id: activeConversationId,
+        sender_id: activeChatCurrentUserId,
+        content: txt,
+        created_at: new Date().toISOString()
+    };
+    
+    appendSingleMessage(optimisticMsg, true, activeChatOtherUser.name);
+    
+    // Persist to Supabase / REST API
+    try {
+        const saved = await KS_CHAT.sendMessageDirect(activeConversationId, txt);
+        if (saved && saved.id) {
+            renderedMessageIds.delete(tempId);
+            renderedMessageIds.add(saved.id);
+            const tempRow = document.getElementById(`msg-row-${tempId}`);
+            if (tempRow) tempRow.id = `msg-row-${saved.id}`;
+        }
+    } catch (e) {
+        console.warn('sendChatMessage persistence note:', e);
+    }
 }
 
-KS_CHAT.onMessage(msg => {
-    if(msg.conversation_id === activeConversationId) {
-        const msgsEl = document.getElementById('chat-msgs');
-        msgsEl.innerHTML += `<div style="margin-bottom:10px; text-align:left">
-            <div style="display:inline-block; padding:8px 12px; border-radius:12px; background:var(--soil-panel-2); color:#fff">
-                ${msg.content}
-            </div>
-        </div>`;
-        msgsEl.scrollTop = msgsEl.scrollHeight;
-    } else {
-        toast('New message received!', '💬');
-    }
-});
+if (window.KS_CHAT) {
+    KS_CHAT.onMessage(msg => {
+        if (msg.conversation_id === activeConversationId) {
+            const isMe = msg.sender_id === activeChatCurrentUserId;
+            appendSingleMessage(msg, isMe, activeChatOtherUser.name);
+        } else {
+            toast(tr('new_message_notification', 'New message received! 💬'), '💬');
+        }
+    });
+}

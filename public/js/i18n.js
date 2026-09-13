@@ -181,7 +181,12 @@
       "order_success": "Order placed successfully! 🎉",
       "chat_req_sent": "Chat request sent to farmer! 📩",
       "req_sent": "Request Sent",
-      "save_profile_success": "Profile saved successfully! 🎉"
+      "save_profile_success": "Profile saved successfully! 🎉",
+      "you": "You",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "no_messages_yet": "No messages yet. Say hello!",
+      "new_message_notification": "New message received! 💬"
     },
 
     hi: {
@@ -362,7 +367,12 @@
       "order_success": "ऑर्डर सफलतापूर्वक दर्ज किया गया! 🎉",
       "chat_req_sent": "किसान को चैट अनुरोध भेज दिया गया! 📩",
       "req_sent": "अनुरोध भेजा गया",
-      "save_profile_success": "प्रोफाइल सफलतापूर्वक सहेजी गई! 🎉"
+      "save_profile_success": "प्रोफाइल सफलतापूर्वक सहेजी गई! 🎉",
+      "you": "आप",
+      "today": "आज",
+      "yesterday": "कल",
+      "no_messages_yet": "अभी कोई संदेश नहीं है। नमस्ते कहें!",
+      "new_message_notification": "नया संदेश प्राप्त हुआ! 💬"
     },
 
     mr: {
@@ -543,7 +553,12 @@
       "order_success": "ऑर्डर यशस्वीरीत्या नोंदवली गेली! 🎉",
       "chat_req_sent": "शेतकऱ्याला चॅट विनंती पाठवली! 📩",
       "req_sent": "विनंती पाठवली",
-      "save_profile_success": "प्रोफाइल यशस्वीरीत्या जतन केली! 🎉"
+      "save_profile_success": "प्रोफाइल यशस्वीरीत्या जतन केली! 🎉",
+      "you": "तुम्ही",
+      "today": "आज",
+      "yesterday": "काल",
+      "no_messages_yet": "अजून कोणतेही संदेश नाहीत. नमस्कार करा!",
+      "new_message_notification": "नवीन संदेश आला आहे! 💬"
     }
   };
 

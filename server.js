@@ -407,6 +407,60 @@ app.get('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
   }
 });
 
+app.post('/api/conversations/:id/messages', authMiddleware, async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
+    const client = getUserClient(req);
+    // Verify participant
+    const { data: conv, error: convError } = await client.from('conversations')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (convError || !conv || (conv.user_one !== req.user.id && conv.user_two !== req.user.id)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    
+    let msgData = null;
+    const { data: inserted, error: insertErr } = await client.from('messages')
+      .insert({
+        conversation_id: req.params.id,
+        sender_id: req.user.id,
+        content: content.trim()
+      })
+      .select()
+      .single();
+      
+    if (insertErr) {
+      const { data: fbInserted, error: fbErr } = await supabase.from('messages')
+        .insert({
+          conversation_id: req.params.id,
+          sender_id: req.user.id,
+          content: content.trim()
+        })
+        .select()
+        .single();
+      if (fbErr) throw fbErr;
+      msgData = fbInserted;
+    } else {
+      msgData = inserted;
+    }
+    
+    try {
+      io.to(`conv_${req.params.id}`).emit('receive_message', msgData);
+    } catch (socketErr) {
+      console.warn('Socket emit note:', socketErr);
+    }
+    
+    res.status(201).json(msgData);
+  } catch (err) {
+    console.error('POST /api/conversations/:id/messages error:', err);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // --- Orders Routes ---
 app.post('/api/orders', authMiddleware, async (req, res) => {
   try {
