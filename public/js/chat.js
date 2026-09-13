@@ -8,6 +8,10 @@
   
   CHAT.init = async function(userId) {
     currentUserId = userId;
+    if (typeof io !== 'function') {
+      console.warn('Socket.IO library not loaded, real-time messaging offline');
+      return;
+    }
     const token = await KS_AUTH.getToken();
     socket = io({ transports: ['websocket', 'polling'] });
     

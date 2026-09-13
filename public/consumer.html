@@ -15,6 +15,7 @@
     <div class="brand"><span class="dot"></span>KisanSetu</div>
     <div style="display:flex; gap:10px; align-items:center;">
       <span id="consumer-name" style="font-size:.88rem; font-weight:600;"></span>
+      <button class="exit-btn" style="color:var(--leaf-bright); border-color:#324428;" onclick="KS_AUTH.switchRole('farmer')">🧑‍🌾 Switch to Farmer</button>
       <button class="exit-btn" onclick="KS_AUTH.signOut()">🚪 Sign Out</button>
     </div>
   </div>
@@ -62,7 +63,7 @@
   <div id="toast-stack"></div>
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
   <script src="/js/supabase-client.js"></script>
   <script src="/js/auth.js"></script>
   <script src="/js/chat.js"></script>

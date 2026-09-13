@@ -11,15 +11,23 @@ function toast(msg, icon) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await KS_AUTH.requireAuth();
+    setupNav();
+    const authed = await KS_AUTH.requireAuth();
+    if (!authed) return;
+    
     const user = await KS_AUTH.getUser();
     const profile = await KS_AUTH.getProfile();
     
     document.getElementById('farmer-name-pill').textContent = profile?.full_name || 'Farmer';
     
-    await KS_CHAT.init(user.id);
+    try {
+      if (user && window.KS_CHAT) {
+        await KS_CHAT.init(user.id);
+      }
+    } catch (err) {
+      console.warn('Chat init non-critical warning:', err);
+    }
     
-    setupNav();
     renderProductsTab();
 });
 

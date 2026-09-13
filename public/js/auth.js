@@ -52,16 +52,18 @@
       return null;
     }
     const headers = { 'Authorization': 'Bearer ' + token, ...options.headers };
-    if (options.body && !(options.body instanceof FormData)) {
+    if (options.body && !(options.body instanceof FormData) && typeof options.body !== 'string') {
       headers['Content-Type'] = 'application/json';
       options.body = JSON.stringify(options.body);
+    } else if (typeof options.body === 'string' && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
     }
     const res = await fetch(url, { ...options, headers });
     if (res.status === 401) {
       window.location.href = '/auth.html';
       return null;
     }
-    return res.json();
+    return res;
   };
   
   // Sign up with email
@@ -126,13 +128,38 @@
   
   // Redirect to appropriate dashboard based on role
   AUTH.redirectToDashboard = async function() {
+    const savedRole = localStorage.getItem('ks_signup_role');
     let profile = await AUTH.getProfile();
-    if (!profile) {
-      // Small delay in case profile trigger is finishing
-      await new Promise(r => setTimeout(r, 600));
-      profile = await AUTH.getProfile();
+    
+    // If the user selected a specific role, sync it to their profile in Supabase
+    if (savedRole) {
+      const user = await AUTH.getUser();
+      if (user && profile && profile.role !== savedRole) {
+        const client = sb();
+        if (client) {
+          await client.from('profiles').update({ role: savedRole }).eq('id', user.id);
+          profile = await AUTH.getProfile();
+        }
+      }
     }
-    if (profile && profile.role === 'farmer') {
+    
+    const role = profile?.role || savedRole || 'farmer';
+    if (role === 'farmer') {
+      window.location.href = '/farmer.html';
+    } else {
+      window.location.href = '/consumer.html';
+    }
+  };
+  
+  // Switch role between farmer and consumer
+  AUTH.switchRole = async function(newRole) {
+    localStorage.setItem('ks_signup_role', newRole);
+    const client = sb();
+    const user = await AUTH.getUser();
+    if (client && user) {
+      await client.from('profiles').update({ role: newRole }).eq('id', user.id);
+    }
+    if (newRole === 'farmer') {
       window.location.href = '/farmer.html';
     } else {
       window.location.href = '/consumer.html';
@@ -143,17 +170,14 @@
   AUTH.handleCallback = async function() {
     const client = sb();
     if (!client) return;
-    const role = localStorage.getItem('ks_signup_role');
-    if (role) {
-      localStorage.removeItem('ks_signup_role');
-      const user = await AUTH.getUser();
-      if (user) {
-        // Update profile role if it was a new Google signup
-        await client.from('profiles').update({ 
-          role: role,
-          full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'User'
-        }).eq('id', user.id);
-      }
+    const role = localStorage.getItem('ks_signup_role') || 'farmer';
+    const user = await AUTH.getUser();
+    if (user) {
+      // Update profile role with the user's chosen role
+      await client.from('profiles').update({ 
+        role: role,
+        full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'User'
+      }).eq('id', user.id);
     }
   };
   

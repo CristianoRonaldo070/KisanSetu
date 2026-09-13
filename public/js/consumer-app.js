@@ -13,15 +13,23 @@ function toast(msg, icon) {
 let cart = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
-    await KS_AUTH.requireAuth();
+    setupNav();
+    const authed = await KS_AUTH.requireAuth();
+    if (!authed) return;
+    
     const user = await KS_AUTH.getUser();
     const profile = await KS_AUTH.getProfile();
     
     document.getElementById('consumer-name').textContent = profile?.full_name || 'Consumer';
     
-    await KS_CHAT.init(user.id);
+    try {
+      if (user && window.KS_CHAT) {
+        await KS_CHAT.init(user.id);
+      }
+    } catch (err) {
+      console.warn('Chat init non-critical warning:', err);
+    }
     
-    setupNav();
     renderBrowseTab();
 });
 
