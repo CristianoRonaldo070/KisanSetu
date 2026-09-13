@@ -115,8 +115,14 @@
     // Check if this is a callback from Google OAuth
     (async function() {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('callback') === 'true') {
-        // Handle OAuth callback
+      const isCallback = params.get('callback') === 'true' || window.location.hash.includes('access_token');
+      if (isCallback) {
+        showError('Signing you in with Google, please wait...');
+        document.getElementById('auth-error').style.background = 'rgba(127,166,83,0.14)';
+        document.getElementById('auth-error').style.color = 'var(--leaf-bright)';
+        
+        // Brief pause to let Supabase client extract the session from URL hash
+        await new Promise(r => setTimeout(r, 600));
         await KS_AUTH.handleCallback();
         await KS_AUTH.redirectToDashboard();
         return;
