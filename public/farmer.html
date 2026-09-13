@@ -51,7 +51,14 @@
         <div class="form-field"><label>Unit</label><select class="plain" id="f-unit"><option>kg</option><option>pc</option><option>dozen</option><option>litre</option></select></div>
         <div class="form-field"><label>Your price (₹)</label><input type="number" class="plain" id="f-price" min="0" placeholder="e.g. 40"></div>
         <div class="form-field"><label>Cost to grow (₹)</label><input type="number" class="plain" id="f-cost" min="0" placeholder="e.g. 22"></div>
-        <div class="form-field" style="grid-column:1/-1;"><label>Stock available</label><input type="number" class="plain" id="f-stock" min="0" placeholder="e.g. 60"></div>
+        <div class="form-field"><label>Stock available</label><input type="number" class="plain" id="f-stock" min="0" placeholder="e.g. 60"></div>
+        <div class="form-field" style="grid-column:1/-1;">
+          <label>Crop Photo (Optional)</label>
+          <div style="display:flex; gap:12px; align-items:center;">
+            <div id="crop-img-preview" style="width:48px; height:48px; border-radius:10px; background:#161f13; border:1px dashed #3a4a32; display:flex; align-items:center; justify-content:center; font-size:1.8rem; overflow:hidden; flex-shrink:0;">🌱</div>
+            <input type="file" id="f-image-file" class="plain" accept="image/*" onchange="previewCropImage(this)" style="padding:8px 12px; font-size:.8rem;">
+          </div>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>

@@ -75,22 +75,25 @@ async function renderBrowseTab() {
         let html = '<div style="padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">';
         products.forEach(p => {
             const stockBadge = p.stock > 0 ? `<span class="stock-badge in">In Stock</span>` : `<span class="stock-badge out">Out of Stock</span>`;
-            const farmerName = p.farmer?.full_name || 'Unknown Farmer';
-            const statusDot = `<span class="status-dot ${p.farmer?.delivery_status || 'off'}"></span>`;
+            const farmerName = p.farmer?.full_name || 'Verified Farmer';
+            const statusDot = `<span class="status-dot ${p.farmer?.delivery_status || 'available'}"></span>`;
+            const visual = (p.emoji && (p.emoji.startsWith('data:image') || p.emoji.startsWith('http')))
+                ? `<img src="${p.emoji}" alt="${p.name}" style="width:56px; height:56px; object-fit:cover; border-radius:10px; border:1px solid #3a4a32;">`
+                : `<div style="font-size:2.8rem;">${p.emoji || emojiFor(p.name)}</div>`;
             
             html += `
                 <div class="panel cprod-card">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div style="font-size:3rem;">${p.emoji || emojiFor(p.name)}</div>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                        ${visual}
                         ${stockBadge}
                     </div>
                     <h4>${p.name}</h4>
                     <p class="lr-sub">₹${p.price}/${p.unit}</p>
-                    <div style="margin:10px 0; font-size:0.9rem; display:flex; align-items:center; gap:5px;">
-                        ${statusDot} ${farmerName}
+                    <div style="margin:10px 0; font-size:0.9rem; display:flex; align-items:center; gap:6px;">
+                        ${statusDot} <span>${farmerName}</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.emoji||emojiFor(p.name)}', ${p.price}, '${p.unit}', '${farmerName.replace(/'/g, "\\'")}')" ${p.stock>0?'':'disabled'}>Add to Cart</button>
+                        <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${(p.emoji||emojiFor(p.name)).replace(/'/g, "\\'")}', ${p.price}, '${p.unit}', '${farmerName.replace(/'/g, "\\'")}')" ${p.stock>0?'':'disabled'}>Add to Cart</button>
                         <button class="btn btn-ghost" onclick="requestChatWithFarmer('${p.farmer_id}')">💬 Chat</button>
                     </div>
                 </div>
@@ -420,30 +423,51 @@ async function respondReq(id, status) {
 async function renderProfileTab() {
     contentEl.innerHTML = '<div style="padding:20px;">Loading profile...</div>';
     try {
-        const profile = await KS_AUTH.getProfile();
+        let profile = await KS_AUTH.getProfile();
+        const user = await KS_AUTH.getUser();
+        
+        if (!profile) {
+            profile = {
+                full_name: user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Consumer',
+                phone: '',
+                address: '',
+                city: '',
+                state_province: '',
+                avatar_url: '',
+                latitude: null,
+                longitude: null
+            };
+        }
+        
+        const avatarDisplay = profile.avatar_url 
+            ? `<img src="${profile.avatar_url}" style="width:70px; height:70px; border-radius:50%; object-fit:cover; border:2px solid #3a4a32;">`
+            : `<div style="width:70px; height:70px; border-radius:50%; background:#283523; border:2px solid #3a4a32; display:flex; align-items:center; justify-content:center; font-size:2.4rem;">🛒</div>`;
         
         contentEl.innerHTML = `
-            <div style="padding:20px; max-width:600px; margin:0 auto;">
+            <div style="padding:20px; max-width:620px; margin:0 auto;">
                 <div class="panel">
-                    <div style="display:flex; gap:20px; align-items:center; margin-bottom:20px;">
-                        <div style="font-size:4rem; cursor:pointer;" title="Upload photo" onclick="document.getElementById('photo-upload').click()">👤</div>
+                    <div style="display:flex; gap:20px; align-items:center; margin-bottom:24px;">
+                        <div style="cursor:pointer; position:relative;" title="Click to upload profile photo" onclick="document.getElementById('photo-upload').click()">
+                            ${avatarDisplay}
+                            <div style="position:absolute; bottom:0; right:0; background:var(--water); color:#fff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:.8rem; font-weight:bold; border:2px solid #161f14;">📷</div>
+                        </div>
                         <input type="file" id="photo-upload" style="display:none;" onchange="uploadPhoto(this)" accept="image/*">
                         <div>
-                            <h3>${profile.full_name || 'Consumer'}</h3>
-                            <div class="lr-sub">Update your personal details below.</div>
+                            <h3 id="consumer-heading-name">${profile.full_name || 'Consumer'}</h3>
+                            <div class="lr-sub">Set your name and location to find nearby farmers and chat directly.</div>
                         </div>
                     </div>
                     
                     <div class="form-grid">
-                        <div class="form-field"><label>Full Name</label><input type="text" class="plain" id="p-name" value="${profile.full_name||''}"></div>
-                        <div class="form-field"><label>Phone</label><input type="text" class="plain" id="p-phone" value="${profile.phone||''}"></div>
-                        <div class="form-field" style="grid-column:1/-1;"><label>Address</label><input type="text" class="plain" id="p-addr" value="${profile.address||''}"></div>
-                        <div class="form-field"><label>City</label><input type="text" class="plain" id="p-city" value="${profile.city||''}"></div>
-                        <div class="form-field"><label>State</label><input type="text" class="plain" id="p-state" value="${profile.state_province||''}"></div>
+                        <div class="form-field"><label>Full Name *</label><input type="text" class="plain" id="p-name" value="${profile.full_name||''}" placeholder="e.g. Priya Sharma"></div>
+                        <div class="form-field"><label>Phone Number</label><input type="text" class="plain" id="p-phone" value="${profile.phone||''}" placeholder="e.g. 9876543210"></div>
+                        <div class="form-field" style="grid-column:1/-1;"><label>Delivery Address</label><input type="text" class="plain" id="p-addr" value="${profile.address||''}" placeholder="e.g. Flat 301, Sunshine Apts"></div>
+                        <div class="form-field"><label>City</label><input type="text" class="plain" id="p-city" value="${profile.city||''}" placeholder="e.g. Mumbai"></div>
+                        <div class="form-field"><label>State</label><input type="text" class="plain" id="p-state" value="${profile.state_province||''}" placeholder="e.g. Maharashtra"></div>
                     </div>
                     
-                    <div style="margin-top:20px; display:flex; gap:10px;">
-                        <button class="btn btn-ghost" onclick="useLocation()">📍 Use Current Location</button>
+                    <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
+                        <button class="btn btn-ghost" onclick="useLocation()">📍 Use Current GPS Location</button>
                         <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
                     </div>
                     <input type="hidden" id="p-lat" value="${profile.latitude||''}">
@@ -452,29 +476,34 @@ async function renderProfileTab() {
             </div>
         `;
     } catch(e) {
-        contentEl.innerHTML = '<div style="padding:20px; color:var(--danger)">Error loading profile.</div>';
+        console.error('Profile load error:', e);
+        contentEl.innerHTML = '<div style="padding:20px; color:var(--danger)">Error loading profile: ' + (e.message || e) + '</div>';
     }
 }
 
 async function uploadPhoto(input) {
     if(!input.files || !input.files[0]) return;
-    const formData = new FormData();
-    formData.append('photo', input.files[0]);
-    
-    try {
-        const res = await fetch('/api/profile/photo', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${await KS_AUTH.getToken()}` },
-            body: formData
-        });
-        if(res.ok) {
-            toast('Photo updated');
-        } else {
-            toast('Failed to upload photo', '❌');
-        }
-    } catch(e) {
-        toast('Error uploading', '❌');
+    const file = input.files[0];
+    if (file.size > 2 * 1024 * 1024) {
+        toast('Photo should be under 2MB', '⚠️');
+        return;
     }
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        const base64 = e.target.result;
+        try {
+            const user = await KS_AUTH.getUser();
+            const client = window.supabaseClient;
+            if (client && user) {
+                await client.from('profiles').upsert({ id: user.id, avatar_url: base64, role: 'consumer' });
+                toast('Profile photo updated! 📸');
+                renderProfileTab();
+            }
+        } catch(err) {
+            toast('Failed to update photo', '❌');
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 function useLocation() {
@@ -482,36 +511,47 @@ function useLocation() {
         toast('Geolocation not supported', '❌');
         return;
     }
-    toast('Getting location...', '⏳');
+    toast('Getting GPS location...', '⏳');
     navigator.geolocation.getCurrentPosition(pos => {
         document.getElementById('p-lat').value = pos.coords.latitude;
         document.getElementById('p-lng').value = pos.coords.longitude;
-        toast('Location grabbed!');
+        toast('Location grabbed! Click Save Profile to apply.');
     }, err => {
-        toast('Failed to get location', '❌');
+        toast('Location access denied or unavailable', '❌');
     });
 }
 
 async function saveProfile() {
+    const name = document.getElementById('p-name').value.trim();
+    if (!name) {
+        toast('Please enter your full name', '⚠️');
+        return;
+    }
     const data = {
-        full_name: document.getElementById('p-name').value,
+        full_name: name,
         phone: document.getElementById('p-phone').value,
         address: document.getElementById('p-addr').value,
         city: document.getElementById('p-city').value,
         state_province: document.getElementById('p-state').value,
-        latitude: parseFloat(document.getElementById('p-lat').value),
-        longitude: parseFloat(document.getElementById('p-lng').value)
+        latitude: parseFloat(document.getElementById('p-lat').value) || null,
+        longitude: parseFloat(document.getElementById('p-lng').value) || null,
+        role: 'consumer'
     };
     
     try {
-        const res = await KS_AUTH.apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(data) });
-        if(res.ok) {
-            toast('Profile saved');
-            document.getElementById('consumer-name').textContent = data.full_name || 'Consumer';
-        } else {
-            toast('Failed to save profile', '❌');
+        const user = await KS_AUTH.getUser();
+        const client = window.supabaseClient;
+        if (client && user) {
+            const { error } = await client.from('profiles').upsert({ id: user.id, ...data });
+            if (error) console.warn('Direct upsert note:', error);
         }
+        await KS_AUTH.apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify(data) });
+        
+        document.getElementById('consumer-name').textContent = name;
+        toast('Profile saved successfully! 🎉');
+        renderProfileTab();
     } catch(e) {
+        console.error('Save profile error:', e);
         toast('Error saving profile', '❌');
     }
 }

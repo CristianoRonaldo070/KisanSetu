@@ -62,8 +62,20 @@ const authMiddleware = async (req, res, next) => {
 // --- Profile Routes ---
 app.get('/api/profile', authMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', req.user.id).single();
+    let { data, error } = await supabase.from('profiles').select('*').eq('id', req.user.id).maybeSingle();
     if (error) throw error;
+    if (!data) {
+      // Auto-create default profile for new user
+      const defaultProfile = {
+        id: req.user.id,
+        role: req.user.user_metadata?.role || 'farmer',
+        full_name: req.user.user_metadata?.full_name || req.user.user_metadata?.name || req.user.email?.split('@')[0] || 'User',
+        avatar_url: req.user.user_metadata?.avatar_url || ''
+      };
+      const { data: inserted, error: insertError } = await supabase.from('profiles').upsert(defaultProfile).select().single();
+      if (!insertError && inserted) data = inserted;
+      else data = defaultProfile;
+    }
     res.json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -72,8 +84,8 @@ app.get('/api/profile', authMiddleware, async (req, res) => {
 
 app.put('/api/profile', authMiddleware, async (req, res) => {
   try {
-    const updates = { ...req.body, updated_at: new Date() };
-    const { data, error } = await supabase.from('profiles').update(updates).eq('id', req.user.id).select().single();
+    const updates = { ...req.body, id: req.user.id, updated_at: new Date() };
+    const { data, error } = await supabase.from('profiles').upsert(updates).select().single();
     if (error) throw error;
     res.json(data);
   } catch (err) {
