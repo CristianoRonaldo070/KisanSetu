@@ -494,6 +494,261 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
   }
 });
 
+// --- Procurement Routes (Real-Time Shared Mandi Queue) ---
+function parseProcurementData(deliveryNote) {
+  if (!deliveryNote || typeof deliveryNote !== 'string') {
+    return { note: '', active: null, completed: [] };
+  }
+  try {
+    const parsed = JSON.parse(deliveryNote);
+    if (parsed && typeof parsed === 'object' && (parsed.procurement || parsed.active || parsed.note !== undefined)) {
+      const proc = parsed.procurement || parsed;
+      return {
+        note: parsed.note || '',
+        active: proc.active || null,
+        completed: Array.isArray(proc.completed) ? proc.completed : []
+      };
+    }
+  } catch (e) {
+    // Plain string delivery note
+  }
+  return { note: deliveryNote, active: null, completed: [] };
+}
+
+function serializeProcurementData(noteText, active, completed) {
+  return JSON.stringify({
+    note: noteText || '',
+    procurement: {
+      active: active || null,
+      completed: Array.isArray(completed) ? completed : []
+    }
+  });
+}
+
+app.get('/api/procurement/bookings', async (req, res) => {
+  try {
+    const { center_id, date } = req.query;
+    const { data: profiles, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, delivery_note');
+
+    if (error) throw error;
+
+    const allActive = [];
+    const allCompleted = [];
+
+    (profiles || []).forEach(p => {
+      const proc = parseProcurementData(p.delivery_note);
+      if (proc.active) {
+        const b = {
+          ...proc.active,
+          user_id: p.id,
+          farmer_name: p.full_name || 'Farmer',
+          avatar_url: p.avatar_url || ''
+        };
+        const bCenter = b.centerId || b.center_id;
+        if ((!center_id || bCenter === center_id) && (!date || b.date === date)) {
+          allActive.push(b);
+        }
+      }
+      if (proc.completed && proc.completed.length) {
+        proc.completed.forEach(c => {
+          const cb = {
+            ...c,
+            user_id: p.id,
+            farmer_name: p.full_name || 'Farmer',
+            avatar_url: p.avatar_url || ''
+          };
+          const cbCenter = cb.centerId || cb.center_id;
+          if ((!center_id || cbCenter === center_id) && (!date || cb.date === date)) {
+            allCompleted.push(cb);
+          }
+        });
+      }
+    });
+
+    allActive.sort((a, b) => a.token - b.token);
+    allCompleted.sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+
+    const currentlyServing = allActive.length > 0 ? allActive[0].token : null;
+
+    res.json({
+      active: allActive,
+      completed: allCompleted,
+      currentlyServing
+    });
+  } catch (err) {
+    console.error('GET /api/procurement/bookings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/procurement/bookings', authMiddleware, async (req, res) => {
+  try {
+    const { centerId, date, slot, cropName, qty, vehicle } = req.body;
+    if (!centerId || !date || !slot || !cropName || !qty) {
+      return res.status(400).json({ error: 'Missing required booking fields' });
+    }
+
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, delivery_note')
+      .eq('id', req.user.id)
+      .single();
+
+    if (profErr || !profile) return res.status(404).json({ error: 'Profile not found' });
+
+    const userProc = parseProcurementData(profile.delivery_note);
+    if (userProc.active && userProc.active.stage !== 'payment') {
+      return res.status(400).json({ error: 'You already have an active booking' });
+    }
+
+    const { data: allProfiles } = await supabase.from('profiles').select('delivery_note');
+    let maxToken = 0;
+    (allProfiles || []).forEach(p => {
+      const pData = parseProcurementData(p.delivery_note);
+      const activeCenter = pData.active ? (pData.active.centerId || pData.active.center_id) : null;
+      if (pData.active && activeCenter === centerId && pData.active.date === date) {
+        if (pData.active.token > maxToken) maxToken = pData.active.token;
+      }
+      (pData.completed || []).forEach(c => {
+        const cCenter = c.centerId || c.center_id;
+        if (cCenter === centerId && c.date === date) {
+          if (c.token > maxToken) maxToken = c.token;
+        }
+      });
+    });
+
+    const nextToken = maxToken + 1;
+    const bay = ((nextToken - 1) % 4) + 1;
+
+    const newBooking = {
+      id: 'proc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+      user_id: req.user.id,
+      farmer_name: profile.full_name || 'Farmer',
+      avatar_url: profile.avatar_url || '',
+      centerId,
+      date,
+      slot,
+      cropName,
+      qty: parseFloat(qty),
+      vehicle: vehicle ? vehicle.trim() : '',
+      token: nextToken,
+      stage: 'confirmed',
+      bay,
+      createdAt: new Date().toISOString()
+    };
+
+    userProc.active = newBooking;
+    const serialized = serializeProcurementData(userProc.note, userProc.active, userProc.completed);
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ delivery_note: serialized, updated_at: new Date() })
+      .eq('id', req.user.id);
+
+    if (updateErr) throw updateErr;
+
+    try {
+      io.emit('procurement_updated', { action: 'book', booking: newBooking });
+    } catch (e) {
+      console.warn('Socket emit note:', e);
+    }
+
+    res.status(201).json(newBooking);
+  } catch (err) {
+    console.error('POST /api/procurement/bookings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/procurement/bookings/:id/stage', authMiddleware, async (req, res) => {
+  try {
+    const { stage } = req.body;
+    const bookingId = req.params.id;
+
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('id, delivery_note')
+      .eq('id', req.user.id)
+      .single();
+
+    if (profErr || !profile) return res.status(404).json({ error: 'Profile not found' });
+
+    const userProc = parseProcurementData(profile.delivery_note);
+    if (!userProc.active || userProc.active.id !== bookingId) {
+      return res.status(404).json({ error: 'Active booking not found' });
+    }
+
+    userProc.active.stage = stage;
+    let finishedBooking = null;
+
+    if (stage === 'payment') {
+      finishedBooking = { ...userProc.active, stage: 'payment', completedAt: new Date().toISOString() };
+      userProc.completed.unshift(finishedBooking);
+      userProc.active = null;
+    }
+
+    const serialized = serializeProcurementData(userProc.note, userProc.active, userProc.completed);
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ delivery_note: serialized, updated_at: new Date() })
+      .eq('id', req.user.id);
+
+    if (updateErr) throw updateErr;
+
+    try {
+      io.emit('procurement_updated', { action: 'stage_change', bookingId, stage });
+    } catch (e) {
+      console.warn('Socket emit note:', e);
+    }
+
+    res.json({ success: true, active: userProc.active, completed: finishedBooking });
+  } catch (err) {
+    console.error('PUT /api/procurement/bookings/:id/stage error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/procurement/bookings/:id', authMiddleware, async (req, res) => {
+  try {
+    const bookingId = req.params.id;
+    const { data: profile, error: profErr } = await supabase
+      .from('profiles')
+      .select('id, delivery_note')
+      .eq('id', req.user.id)
+      .single();
+
+    if (profErr || !profile) return res.status(404).json({ error: 'Profile not found' });
+
+    const userProc = parseProcurementData(profile.delivery_note);
+    if (userProc.active && userProc.active.id === bookingId) {
+      userProc.active = null;
+    }
+
+    const serialized = serializeProcurementData(userProc.note, userProc.active, userProc.completed);
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ delivery_note: serialized, updated_at: new Date() })
+      .eq('id', req.user.id);
+
+    if (updateErr) throw updateErr;
+
+    try {
+      io.emit('procurement_updated', { action: 'cancel', bookingId });
+    } catch (e) {
+      console.warn('Socket emit note:', e);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/procurement/bookings/:id error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- Socket.IO ---
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);

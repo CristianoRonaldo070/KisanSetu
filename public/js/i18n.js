@@ -250,7 +250,8 @@
       "proc_status_in_progress": "Weighing in Progress",
       "proc_status_next": "Next in Line (At Gate)",
       "proc_status_waiting": "In Queue",
-      "proc_now_serving": "Now Serving!"
+      "proc_now_serving": "Now Serving!",
+      "proc_queue_empty": "No farmers in queue yet for this center. Book a slot to get Token #1!"
     },
 
     hi: {
@@ -500,7 +501,8 @@
       "proc_status_in_progress": "तुलाई जारी है",
       "proc_status_next": "कतार में अगला (गेट पर)",
       "proc_status_waiting": "कतार में प्रतीक्षारत",
-      "proc_now_serving": "अब आपकी बारी!"
+      "proc_now_serving": "अब आपकी बारी!",
+      "proc_queue_empty": "इस केंद्र के लिए अभी कोई किसान कतार में नहीं है। टोकन #1 पाने के लिए स्लॉट बुक करें!"
     },
 
     mr: {
@@ -750,7 +752,8 @@
       "proc_status_in_progress": "वजन चालू आहे",
       "proc_status_next": "रांगेत पुढील (गेटवर)",
       "proc_status_waiting": "रांगेत प्रतीक्षेत",
-      "proc_now_serving": "आता तुमची पाळी!"
+      "proc_now_serving": "आता तुमची पाळी!",
+      "proc_queue_empty": "या केंद्रासाठी अद्याप कोणताही शेतकरी रांगेत नाही. टोकन #1 मिळवण्यासाठी स्लॉट बुक करा!"
     }
   };
 

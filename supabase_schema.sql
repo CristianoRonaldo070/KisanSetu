@@ -83,6 +83,22 @@ CREATE TABLE IF NOT EXISTS order_items (
    unit_price NUMERIC NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS procurement_bookings (
+   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+   center_id TEXT NOT NULL,
+   date DATE NOT NULL DEFAULT CURRENT_DATE,
+   slot TEXT NOT NULL,
+   crop_name TEXT NOT NULL,
+   qty NUMERIC NOT NULL DEFAULT 0,
+   vehicle TEXT DEFAULT '',
+   token INTEGER NOT NULL,
+   stage TEXT NOT NULL DEFAULT 'confirmed' CHECK (stage IN ('confirmed','gate','weighbridge','complete','payment')),
+   bay INTEGER DEFAULT 1,
+   created_at TIMESTAMPTZ DEFAULT NOW(),
+   updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 
 -- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -92,6 +108,7 @@ ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE procurement_bookings ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 
@@ -197,6 +214,18 @@ CREATE POLICY "Consumers can insert order items" ON order_items FOR INSERT WITH 
     )
 );
 
+-- procurement_bookings
+DO $$ BEGIN
+    DROP POLICY IF EXISTS "Anyone can read procurement bookings" ON procurement_bookings;
+    DROP POLICY IF EXISTS "Farmers can insert procurement bookings" ON procurement_bookings;
+    DROP POLICY IF EXISTS "Farmers can update own procurement bookings" ON procurement_bookings;
+    DROP POLICY IF EXISTS "Farmers can delete own procurement bookings" ON procurement_bookings;
+EXCEPTION WHEN OTHERS THEN END $$;
+
+CREATE POLICY "Anyone can read procurement bookings" ON procurement_bookings FOR SELECT USING (true);
+CREATE POLICY "Farmers can insert procurement bookings" ON procurement_bookings FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Farmers can update own procurement bookings" ON procurement_bookings FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Farmers can delete own procurement bookings" ON procurement_bookings FOR DELETE USING (auth.uid() = user_id);
 
 -- Triggers
 

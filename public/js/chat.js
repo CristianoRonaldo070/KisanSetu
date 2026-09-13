@@ -39,6 +39,10 @@
         socket.on('user_typing', (data) => {
           typingCallbacks.forEach(cb => cb(data));
         });
+
+        socket.on('procurement_updated', (data) => {
+          window.dispatchEvent(new CustomEvent('ks_procurement_updated', { detail: data }));
+        });
       } catch (e) {
         console.warn('Socket.IO init non-critical notice:', e);
       }
