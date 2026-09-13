@@ -236,17 +236,40 @@ async function saveProduct() {
     
     try {
         toast('Saving crop...', '⏳');
-        // Pre-ensure profile exists in Supabase so foreign key references pass
         const user = await KS_AUTH.getUser();
         const client = window.supabaseClient;
-        if (client && user) {
+        
+        if (!user) {
+            toast('Please sign in first', '⚠️');
+            return;
+        }
+
+        // 1. Ensure farmer profile exists in Supabase
+        if (client) {
             await client.from('profiles').upsert({
                 id: user.id,
                 role: 'farmer',
                 full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || 'Farmer'
             }, { onConflict: 'id' });
+
+            // 2. Direct client insert/update (runs with user's JWT session, RLS passes 100%)
+            let directResult;
+            if (id) {
+                directResult = await client.from('products').update(data).eq('id', id).eq('farmer_id', user.id);
+            } else {
+                directResult = await client.from('products').insert({ ...data, farmer_id: user.id });
+            }
+
+            if (!directResult.error) {
+                closeProductModal();
+                toast('Crop saved successfully! 🌾');
+                renderProductsTab();
+                return;
+            }
+            console.warn('Direct client save returned error, falling back to API:', directResult.error);
         }
 
+        // 3. Fallback to API route
         let res;
         if(id) {
             res = await KS_AUTH.apiFetch(`/api/products/${id}`, { method: 'PUT', body: JSON.stringify(data) });
@@ -274,15 +297,25 @@ async function saveProduct() {
 async function deleteProduct(id) {
     if(!confirm('Are you sure you want to delete this product?')) return;
     try {
+        const user = await KS_AUTH.getUser();
+        const client = window.supabaseClient;
+        if (client && user) {
+            const { error } = await client.from('products').delete().eq('id', id).eq('farmer_id', user.id);
+            if (!error) {
+                toast('Product deleted');
+                renderProductsTab();
+                return;
+            }
+        }
         const res = await KS_AUTH.apiFetch(`/api/products/${id}`, { method: 'DELETE' });
-        if(res.ok) {
+        if(res && (res.ok || res.status === 204)) {
             toast('Product deleted');
             renderProductsTab();
         } else {
             toast('Failed to delete', '❌');
         }
     } catch(e) {
-        toast('Error deleting', '❌');
+        toast('Error deleting: ' + (e.message || e), '❌');
     }
 }
 

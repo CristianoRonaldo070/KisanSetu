@@ -60,6 +60,16 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
+// Helper for scoped client that carries user authorization for RLS
+const getUserClient = (req) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return supabase;
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false }
+  });
+};
+
 // --- Profile Routes ---
 app.get('/api/profile', authMiddleware, async (req, res) => {
   try {
@@ -155,15 +165,16 @@ app.get('/api/products/mine', authMiddleware, async (req, res) => {
 
 app.post('/api/products', authMiddleware, async (req, res) => {
   try {
+    const client = getUserClient(req);
     // Ensure farmer profile exists to satisfy foreign key and RLS constraints
-    await supabase.from('profiles').upsert({
+    await client.from('profiles').upsert({
       id: req.user.id,
       role: 'farmer',
       full_name: req.user.user_metadata?.full_name || req.user.user_metadata?.name || req.user.email?.split('@')[0] || 'Farmer'
     }, { onConflict: 'id' });
     
     const product = { ...req.body, farmer_id: req.user.id };
-    const { data, error } = await supabase.from('products').insert(product).select().single();
+    const { data, error } = await client.from('products').insert(product).select().single();
     if (error) throw error;
     res.status(201).json(data);
   } catch (err) {
@@ -174,7 +185,8 @@ app.post('/api/products', authMiddleware, async (req, res) => {
 
 app.put('/api/products/:id', authMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase.from('products')
+    const client = getUserClient(req);
+    const { data, error } = await client.from('products')
       .update(req.body)
       .eq('id', req.params.id)
       .eq('farmer_id', req.user.id)
@@ -188,7 +200,8 @@ app.put('/api/products/:id', authMiddleware, async (req, res) => {
 
 app.delete('/api/products/:id', authMiddleware, async (req, res) => {
   try {
-    const { error } = await supabase.from('products')
+    const client = getUserClient(req);
+    const { error } = await client.from('products')
       .delete()
       .eq('id', req.params.id)
       .eq('farmer_id', req.user.id);
