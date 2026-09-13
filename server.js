@@ -7,6 +7,8 @@ const cors = require('cors');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 
+const path = require('path');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -16,9 +18,25 @@ const io = new Server(server, {
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 const upload = multer({ storage: multer.memoryStorage() });
 
+const publicDir = path.join(__dirname, 'public');
+
 app.use(cors());
 app.use(express.json());
-app.use(express.static('./public'));
+app.use(express.static(publicDir));
+
+// Explicit page routes for reliable serverless rendering
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicDir, 'index.html'));
+});
+app.get('/auth', (req, res) => {
+  res.sendFile(path.join(publicDir, 'auth.html'));
+});
+app.get('/farmer', (req, res) => {
+  res.sendFile(path.join(publicDir, 'farmer.html'));
+});
+app.get('/consumer', (req, res) => {
+  res.sendFile(path.join(publicDir, 'consumer.html'));
+});
 
 // Auth Middleware
 const authMiddleware = async (req, res, next) => {
