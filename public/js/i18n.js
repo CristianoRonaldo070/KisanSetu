@@ -237,7 +237,20 @@
       "proc_cancelled": "Booking cancelled.",
       "proc_alert_called": "🔔 Your token is being called! Proceed to Weighbridge Bay.",
       "proc_quintal": "quintals",
-      "proc_per_quintal": "/quintal"
+      "proc_per_quintal": "/quintal",
+      "proc_live_roster_title": "📋 Center Live Queue Board",
+      "proc_live_roster_sub": "Live queue & real-time status of all farmers at this procurement center",
+      "proc_col_token": "Token",
+      "proc_col_farmer": "Farmer Name",
+      "proc_col_crop": "Crop & Qty",
+      "proc_col_vehicle": "Vehicle",
+      "proc_col_status": "Current Status",
+      "proc_col_bay": "Bay",
+      "proc_you_tag": "YOU",
+      "proc_status_in_progress": "Weighing in Progress",
+      "proc_status_next": "Next in Line (At Gate)",
+      "proc_status_waiting": "In Queue",
+      "proc_now_serving": "Now Serving!"
     },
 
     hi: {
@@ -474,7 +487,20 @@
       "proc_cancelled": "बुकिंग रद्द हो गई।",
       "proc_alert_called": "🔔 आपका टोकन बुलाया जा रहा है! तुलाई बे पर जाएं।",
       "proc_quintal": "क्विंटल",
-      "proc_per_quintal": "/क्विंटल"
+      "proc_per_quintal": "/क्विंटल",
+      "proc_live_roster_title": "📋 केंद्र लाइव कतार बोर्ड",
+      "proc_live_roster_sub": "इस अधिप्राप्ती केंद्र पर सभी किसानों की लाइव कतार और रीयल-टाइम स्थिति",
+      "proc_col_token": "टोकन",
+      "proc_col_farmer": "किसान का नाम",
+      "proc_col_crop": "फसल और मात्रा",
+      "proc_col_vehicle": "वाहन",
+      "proc_col_status": "वर्तमान स्थिति",
+      "proc_col_bay": "बे",
+      "proc_you_tag": "आप",
+      "proc_status_in_progress": "तुलाई जारी है",
+      "proc_status_next": "कतार में अगला (गेट पर)",
+      "proc_status_waiting": "कतार में प्रतीक्षारत",
+      "proc_now_serving": "अब आपकी बारी!"
     },
 
     mr: {
@@ -711,7 +737,20 @@
       "proc_cancelled": "बुकिंग रद्द झाली.",
       "proc_alert_called": "🔔 तुमचा टोकन बोलावला जात आहे! वजनकाटा बे ला जा.",
       "proc_quintal": "क्विंटल",
-      "proc_per_quintal": "/क्विंटल"
+      "proc_per_quintal": "/क्विंटल",
+      "proc_live_roster_title": "📋 केंद्र थेट रांग फलक",
+      "proc_live_roster_sub": "या अधिप्राप्ती केंद्रावरील सर्व शेतकऱ्यांची थेट रांग आणि सद्यस्थिती",
+      "proc_col_token": "टोकन",
+      "proc_col_farmer": "शेतकऱ्याचे नाव",
+      "proc_col_crop": "पीक व प्रमाण",
+      "proc_col_vehicle": "वाहन",
+      "proc_col_status": "सद्यस्थिती",
+      "proc_col_bay": "बे",
+      "proc_you_tag": "तुम्ही",
+      "proc_status_in_progress": "वजन चालू आहे",
+      "proc_status_next": "रांगेत पुढील (गेटवर)",
+      "proc_status_waiting": "रांगेत प्रतीक्षेत",
+      "proc_now_serving": "आता तुमची पाळी!"
     }
   };
 

@@ -984,6 +984,17 @@ const PROCUREMENT_SLOTS = [
 
 const PROC_STAGES = ['confirmed','gate','weighbridge','complete','payment'];
 
+const DUMMY_FARMERS_POOL = [
+  { name:'Ramesh Patil', crop:'Onions', qty:40, vehicle:'MH-14-BT-3321' },
+  { name:'Suresh Deshmukh', crop:'Soybeans', qty:22, vehicle:'MH-15-K-7740' },
+  { name:'Dnyaneshwar Shinde', crop:'Wheat', qty:35, vehicle:'MH-12-Q-9812' },
+  { name:'Anand Rao Pawar', crop:'Wheat', qty:18, vehicle:'MH-42-B-1198' },
+  { name:'Balasaheb Kadam', crop:'Turmeric', qty:25, vehicle:'MH-11-AC-5402' },
+  { name:'Baburao Jagtap', crop:'Cotton', qty:30, vehicle:'MH-16-R-6211' },
+  { name:'Sunil Ghorpade', crop:'Onions', qty:45, vehicle:'MH-12-MN-8923' },
+  { name:'Vijay More', crop:'Basmati Rice', qty:28, vehicle:'MH-09-EF-4412' }
+];
+
 let procQueueTimer = null;
 
 function getProcBookings() {
@@ -991,6 +1002,156 @@ function getProcBookings() {
 }
 function saveProcBookings(arr) {
   localStorage.setItem('ks_proc_bookings', JSON.stringify(arr));
+}
+
+function getQueueRosterForBooking(b) {
+  const currentToken = b.currentToken;
+  const userToken = b.token;
+  const startToken = Math.max(1, currentToken - 1);
+  const endToken = Math.max(userToken + 2, currentToken + 3);
+  const userProfileName = document.getElementById('farmer-name-pill')?.textContent?.trim() || tr('you', 'You');
+
+  const list = [];
+  for (let t = startToken; t <= endToken; t++) {
+    if (t === userToken) {
+      let statusType = 'waiting';
+      let statusLabel = tr('proc_status_waiting', 'In Queue');
+      if (b.stage === 'payment' || b.stage === 'complete') {
+        statusType = 'completed';
+        statusLabel = tr('proc_status_complete', 'Completed');
+      } else if (t === currentToken || b.stage === 'weighbridge') {
+        statusType = 'serving';
+        statusLabel = tr('proc_status_in_progress', 'Weighing in Progress');
+      } else if (t === currentToken + 1 || b.stage === 'gate') {
+        statusType = 'next';
+        statusLabel = tr('proc_status_next', 'Next in Line (At Gate)');
+      }
+      list.push({
+        token: t,
+        name: userProfileName,
+        crop: b.cropName,
+        qty: b.qty,
+        vehicle: b.vehicle || 'MH-12-AB-4521',
+        bay: b.bay || 2,
+        isMe: true,
+        statusType,
+        statusLabel
+      });
+    } else {
+      const poolIdx = Math.abs(t * 7) % DUMMY_FARMERS_POOL.length;
+      const f = DUMMY_FARMERS_POOL[poolIdx];
+      const bay = (t % 3) + 1;
+      let statusType = 'waiting';
+      let statusLabel = tr('proc_status_waiting', 'In Queue');
+      if (t < currentToken) {
+        statusType = 'completed';
+        statusLabel = tr('proc_status_complete', 'Completed');
+      } else if (t === currentToken) {
+        statusType = 'serving';
+        statusLabel = tr('proc_status_in_progress', 'Weighing in Progress');
+      } else if (t === currentToken + 1) {
+        statusType = 'next';
+        statusLabel = tr('proc_status_next', 'Next in Line (At Gate)');
+      }
+      list.push({
+        token: t,
+        name: f.name,
+        crop: f.crop,
+        qty: f.qty,
+        vehicle: f.vehicle,
+        bay: bay,
+        isMe: false,
+        statusType,
+        statusLabel
+      });
+    }
+  }
+  return list;
+}
+
+function getPreviewQueueRoster(centerId) {
+  const center = PROCUREMENT_CENTERS.find(c => c.id === centerId) || PROCUREMENT_CENTERS[0];
+  const baseToken = 37;
+  const currentToken = 38;
+  const list = [];
+  for (let t = baseToken; t <= baseToken + 6; t++) {
+    const poolIdx = Math.abs(t * 7) % DUMMY_FARMERS_POOL.length;
+    const f = DUMMY_FARMERS_POOL[poolIdx];
+    const bay = (t % (center.bays || 3)) + 1;
+    let statusType = 'waiting';
+    let statusLabel = tr('proc_status_waiting', 'In Queue');
+    if (t < currentToken) {
+      statusType = 'completed';
+      statusLabel = tr('proc_status_complete', 'Completed');
+    } else if (t === currentToken) {
+      statusType = 'serving';
+      statusLabel = tr('proc_status_in_progress', 'Weighing in Progress');
+    } else if (t === currentToken + 1) {
+      statusType = 'next';
+      statusLabel = tr('proc_status_next', 'Next in Line (At Gate)');
+    }
+    list.push({
+      token: t,
+      name: f.name,
+      crop: f.crop,
+      qty: f.qty,
+      vehicle: f.vehicle,
+      bay: bay,
+      isMe: false,
+      statusType,
+      statusLabel
+    });
+  }
+  return list;
+}
+
+function renderRosterTableHtml(rosterList) {
+  let rows = '';
+  rosterList.forEach(item => {
+    const rowClass = item.isMe ? 'row-you' : (item.statusType === 'serving' ? 'row-serving' : '');
+    const tokenStr = 'TK-' + String(item.token).padStart(3, '0');
+    const badgeClass = item.statusType;
+    const cropObj = PROCUREMENT_CROPS.find(c => c.name === item.crop);
+    const cropEmoji = cropObj ? cropObj.emoji : '🌱';
+
+    rows += `<tr class="${rowClass}">
+      <td><span style="font-weight:700; font-family:monospace; color:${item.isMe ? 'var(--marigold)' : 'var(--cream)'}">${tokenStr}</span></td>
+      <td>
+        <span>${item.name}</span>
+        ${item.isMe ? `<span class="you-pill">${tr('proc_you_tag','YOU')}</span>` : ''}
+      </td>
+      <td>${cropEmoji} ${item.crop} <span style="color:var(--cream-dim); font-size:.78rem;">(${item.qty} qtl)</span></td>
+      <td style="font-family:monospace; font-size:.8rem; color:var(--cream-dim);">${item.vehicle}</td>
+      <td><span style="font-size:.8rem; color:var(--water-bright);">Bay ${item.bay}</span></td>
+      <td><span class="roster-badge ${badgeClass}">${item.statusLabel}</span></td>
+    </tr>`;
+  });
+
+  return `
+    <table class="proc-roster-table">
+      <thead>
+        <tr>
+          <th>${tr('proc_col_token','Token')}</th>
+          <th>${tr('proc_col_farmer','Farmer Name')}</th>
+          <th>${tr('proc_col_crop','Crop & Qty')}</th>
+          <th>${tr('proc_col_vehicle','Vehicle')}</th>
+          <th>${tr('proc_col_bay','Bay')}</th>
+          <th>${tr('proc_col_status','Current Status')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+      </tbody>
+    </table>
+  `;
+}
+
+function updatePreviewRoster() {
+  const container = document.getElementById('proc-preview-roster');
+  const selCenter = document.getElementById('proc-center')?.value || 'apmc-pune';
+  if (container) {
+    container.innerHTML = renderRosterTableHtml(getPreviewQueueRoster(selCenter));
+  }
 }
 
 function renderProcurementTab() {
@@ -1025,7 +1186,7 @@ function renderProcurementTab() {
     <div class="form-grid" style="gap:14px;">
       <div class="form-field">
         <label>${tr('proc_center','Select Center')}</label>
-        <select class="plain" id="proc-center">
+        <select class="plain" id="proc-center" onchange="updatePreviewRoster()">
           ${PROCUREMENT_CENTERS.map(c => `<option value="${c.id}">${c.name}</option>`).join('')}
         </select>
       </div>
@@ -1079,6 +1240,22 @@ function renderProcurementTab() {
   }
   html += `</div></div>`;
 
+  // ── If no active booking, show Live Queue Roster preview for selected center ──
+  if (active.length === 0) {
+    html += `<div class="panel" style="margin-bottom:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <div>
+          <h3 style="color:var(--marigold);">${tr('proc_live_roster_title','📋 Center Live Queue Board')}</h3>
+          <div style="font-size:.78rem; color:var(--cream-dim);">${tr('proc_live_roster_sub','Live queue & real-time status of all farmers at this procurement center')}</div>
+        </div>
+        <span class="roster-badge serving">🟢 Live Mandi Queue</span>
+      </div>
+      <div class="proc-roster-container" id="proc-preview-roster">
+        ${renderRosterTableHtml(getPreviewQueueRoster('apmc-pune'))}
+      </div>
+    </div>`;
+  }
+
   // ── Completed procurements ──
   html += `<div class="panel" style="margin-bottom:18px;">
     <h3 style="color:var(--marigold); margin-bottom:14px;">${tr('proc_section_completed','✅ Completed Procurements')}</h3>
@@ -1097,7 +1274,7 @@ function renderProcurementTab() {
   if (active.length > 0) {
     procQueueTimer = setInterval(() => {
       simulateQueueAdvance(false);
-    }, 50000); // ~50 seconds
+    }, 45000); // 45 seconds
   }
 }
 
@@ -1118,8 +1295,9 @@ function renderProcActiveCard(b) {
   const center = PROCUREMENT_CENTERS.find(c => c.id === b.centerId) || PROCUREMENT_CENTERS[0];
   const crop = PROCUREMENT_CROPS.find(c => c.name === b.cropName) || PROCUREMENT_CROPS[0];
   const stageIdx = PROC_STAGES.indexOf(b.stage);
-  const farmersAhead = Math.max(0, b.currentToken ? (b.token - b.currentToken - 1) : b.farmersAhead);
+  const farmersAhead = Math.max(0, b.token - b.currentToken);
   const waitMin = farmersAhead * 8;
+  const waitDisplay = farmersAhead > 0 ? `${waitMin} ${tr('proc_minutes','min')}` : tr('proc_now_serving','Now Serving!');
 
   let stageLabels = [
     tr('proc_status_confirmed','Slot Confirmed'),
@@ -1179,11 +1357,23 @@ function renderProcActiveCard(b) {
       </div>
       <div class="queue-counter">
         <div class="queue-counter-label">${tr('proc_wait','Est. Wait Time')}</div>
-        <div class="queue-counter-val wait-big">${waitMin > 0 ? waitMin + ' ' + tr('proc_minutes','min') : '—'}</div>
+        <div class="queue-counter-val wait-big">${waitDisplay}</div>
       </div>
     </div>
     ${stepperHtml}
-    <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+
+    <!-- Other Farmers Live Queue Board -->
+    <div style="margin-top:18px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+        <div style="font-weight:700; font-size:.92rem; color:var(--marigold);">${tr('proc_live_roster_title','📋 Center Live Queue Board')}</div>
+        <div style="font-size:.76rem; color:var(--cream-dim);">${center.name} &bull; ${b.date} &bull; ${b.slot}</div>
+      </div>
+      <div class="proc-roster-container">
+        ${renderRosterTableHtml(getQueueRosterForBooking(b))}
+      </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
       <button class="btn btn-water btn-sm" onclick="simulateQueueAdvance(true)">${tr('proc_fast_forward','⏩ Fast Forward (Demo)')}</button>
       <button class="btn btn-ghost btn-sm" onclick="cancelProcurementSlot('${b.id}')" style="color:var(--danger);">${tr('proc_cancel_btn','Cancel Booking')}</button>
     </div>
@@ -1251,8 +1441,8 @@ function bookProcurementSlot() {
   const activeExists = bookings.some(b => b.stage !== 'payment');
   if (activeExists) { toast('You already have an active booking. Complete or cancel it first.', '⚠️'); return; }
 
-  const token = 38 + Math.floor(Math.random() * 12) + 1; // token 39-50
-  const currentToken = token - (2 + Math.floor(Math.random() * 4)); // 2-5 ahead
+  const token = 38 + Math.floor(Math.random() * 8) + 3; // token 41-48
+  const currentToken = token - (2 + Math.floor(Math.random() * 3)); // 2 to 4 ahead
   const center = PROCUREMENT_CENTERS.find(c => c.id === centerId);
   const bay = Math.floor(Math.random() * (center?.bays || 3)) + 1;
 
@@ -1266,7 +1456,7 @@ function bookProcurementSlot() {
     vehicle,
     token,
     currentToken,
-    farmersAhead: token - currentToken - 1,
+    farmersAhead: Math.max(0, token - currentToken),
     stage: 'confirmed',
     bay,
     createdAt: new Date().toISOString()
@@ -1291,37 +1481,27 @@ function simulateQueueAdvance(instant) {
   let changed = false;
   bookings.forEach(b => {
     if (b.stage === 'payment') return;
-    const stageIdx = PROC_STAGES.indexOf(b.stage);
 
-    if (instant) {
-      // Fast forward: advance stage
-      if (stageIdx < PROC_STAGES.length - 1) {
-        b.stage = PROC_STAGES[stageIdx + 1];
-        // Also advance queue counters
-        if (b.currentToken < b.token) {
-          b.currentToken = Math.min(b.token, b.currentToken + 1);
-          b.farmersAhead = Math.max(0, b.token - b.currentToken - 1);
-        }
-        changed = true;
-        if (b.stage === 'weighbridge' && b.currentToken >= b.token - 1) {
-          toast(tr('proc_alert_called','🔔 Your token is being called! Proceed to Weighbridge Bay.'), '🔔');
-        }
+    if (b.currentToken < b.token) {
+      b.currentToken += 1;
+      b.farmersAhead = Math.max(0, b.token - b.currentToken);
+      changed = true;
+      if (b.currentToken === b.token - 1) {
+        b.stage = 'gate';
+      } else if (b.currentToken >= b.token) {
+        b.stage = 'weighbridge';
+        toast(tr('proc_alert_called','🔔 Your token is being called! Proceed to Weighbridge Bay.'), '🔔');
       }
     } else {
-      // Automatic: advance queue by 1 token
-      if (b.currentToken < b.token) {
-        b.currentToken += 1;
-        b.farmersAhead = Math.max(0, b.token - b.currentToken - 1);
+      // currentToken is at or past our token
+      if (b.stage === 'confirmed' || b.stage === 'gate') {
+        b.stage = 'weighbridge';
         changed = true;
-        // Auto-advance stage when it's your turn
-        if (b.currentToken >= b.token - 1 && stageIdx < 2) {
-          b.stage = PROC_STAGES[stageIdx + 1];
-          if (b.stage === 'weighbridge') {
-            toast(tr('proc_alert_called','🔔 Your token is being called! Proceed to Weighbridge Bay.'), '🔔');
-          }
-        }
-      } else if (stageIdx < PROC_STAGES.length - 1) {
-        b.stage = PROC_STAGES[stageIdx + 1];
+      } else if (b.stage === 'weighbridge') {
+        b.stage = 'complete';
+        changed = true;
+      } else if (b.stage === 'complete') {
+        b.stage = 'payment';
         changed = true;
       }
     }
