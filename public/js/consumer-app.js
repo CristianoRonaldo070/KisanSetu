@@ -1,6 +1,16 @@
 const EMOJI = {'Alphonso Mangoes':'🥭','Tomatoes':'🍅','Basmati Rice':'🌾','Turmeric':'🟠','Coconuts':'🥥','Wheat':'🌿','Mustard Greens':'🥬','Onions':'🧅','Spinach':'🥬','Sugarcane':'🎋','Green Chillies':'🌶️','Potatoes':'🥔','Bananas':'🍌','Groundnuts':'🥜'};
 function emojiFor(name) { return EMOJI[name] || '🌱'; }
 
+function renderCropVisual(emoji, name, size = 36) {
+    if (emoji && (emoji.startsWith('data:image') || emoji.startsWith('http'))) {
+        return `<img src="${emoji}" alt="${name || 'Crop'}" style="width:${size}px; height:${size}px; object-fit:cover; border-radius:8px; display:block;">`;
+    }
+    return `<span style="font-size:${size > 30 ? '1.6rem' : '1.1rem'}; line-height:1;">${emoji || emojiFor(name) || '🌱'}</span>`;
+}
+
+let cart = [];
+let consumerProductsMap = {};
+
 function toast(msg, icon) {
   const stack = document.getElementById('toast-stack');
   const el = document.createElement('div');
@@ -9,8 +19,6 @@ function toast(msg, icon) {
   stack.appendChild(el);
   setTimeout(() => { el.classList.add('leave'); setTimeout(() => el.remove(), 320); }, 2400);
 }
-
-let cart = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
     setupNav();
@@ -72,11 +80,13 @@ async function renderBrowseTab() {
             return;
         }
         
+        consumerProductsMap = {};
         let html = '<div style="padding:20px; display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">';
         products.forEach(p => {
             const stockBadge = p.stock > 0 ? `<span class="stock-badge in">In Stock</span>` : `<span class="stock-badge out">Out of Stock</span>`;
             const farmerName = p.farmer?.full_name || 'Verified Farmer';
             const statusDot = `<span class="status-dot ${p.farmer?.delivery_status || 'available'}"></span>`;
+            consumerProductsMap[p.id] = { ...p, farmerName };
             const visual = (p.emoji && (p.emoji.startsWith('data:image') || p.emoji.startsWith('http')))
                 ? `<img src="${p.emoji}" alt="${p.name}" style="width:56px; height:56px; object-fit:cover; border-radius:10px; border:1px solid #3a4a32;">`
                 : `<div style="font-size:2.8rem;">${p.emoji || emojiFor(p.name)}</div>`;
@@ -93,7 +103,7 @@ async function renderBrowseTab() {
                         ${statusDot} <span>${farmerName}</span>
                     </div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${(p.emoji||emojiFor(p.name)).replace(/'/g, "\\'")}', ${p.price}, '${p.unit}', '${farmerName.replace(/'/g, "\\'")}')" ${p.stock>0?'':'disabled'}>Add to Cart</button>
+                        <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}')" ${p.stock>0?'':'disabled'}>Add to Cart</button>
                         <button class="btn btn-ghost" onclick="requestChatWithFarmer('${p.farmer_id}')">💬 Chat</button>
                     </div>
                 </div>
@@ -120,6 +130,14 @@ async function requestChatWithFarmer(farmerId) {
 }
 
 function addToCart(id, name, emoji, price, unit, farmerName) {
+    const p = consumerProductsMap[id];
+    if (p) {
+        name = p.name;
+        emoji = p.emoji || emojiFor(p.name);
+        price = p.price;
+        unit = p.unit;
+        farmerName = p.farmerName;
+    }
     const existing = cart.find(c => c.product_id === id);
     if(existing) {
         existing.qty++;
@@ -168,7 +186,7 @@ function renderCart() {
         html += `
             <div class="list-row" style="margin-bottom:10px; border-bottom:1px solid var(--soil-panel-2); padding-bottom:10px;">
                 <div class="lr-left">
-                    <span class="lr-icon">${item.emoji}</span>
+                    <span class="lr-icon">${renderCropVisual(item.emoji, item.name, 44)}</span>
                     <div>
                         <div class="lr-name">${item.name}</div>
                         <div class="lr-sub">${item.farmer_name} • ₹${item.price}/${item.unit}</div>

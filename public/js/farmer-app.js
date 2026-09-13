@@ -1,6 +1,15 @@
 const EMOJI = {'Alphonso Mangoes':'🥭','Tomatoes':'🍅','Basmati Rice':'🌾','Turmeric':'🟠','Coconuts':'🥥','Wheat':'🌿','Mustard Greens':'🥬','Onions':'🧅','Spinach':'🥬','Sugarcane':'🎋','Green Chillies':'🌶️','Potatoes':'🥔','Bananas':'🍌','Groundnuts':'🥜'};
 function emojiFor(name) { return EMOJI[name] || '🌱'; }
 
+function renderCropVisual(emoji, name, size = 36) {
+    if (emoji && (emoji.startsWith('data:image') || emoji.startsWith('http'))) {
+        return `<img src="${emoji}" alt="${name || 'Crop'}" style="width:${size}px; height:${size}px; object-fit:cover; border-radius:8px; display:block;">`;
+    }
+    return `<span style="font-size:${size > 30 ? '1.6rem' : '1.1rem'}; line-height:1;">${emoji || emojiFor(name) || '🌱'}</span>`;
+}
+
+let currentFarmerProducts = {};
+
 function toast(msg, icon) {
   const stack = document.getElementById('toast-stack');
   const el = document.createElement('div');
@@ -95,8 +104,10 @@ async function renderProductsTab() {
             return;
         }
         
+        currentFarmerProducts = {};
         let html = '<div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:20px;">';
         products.forEach(p => {
+            currentFarmerProducts[p.id] = p;
             const stockStatus = p.stock > 0 ? `<span class="stock-badge in">In Stock</span>` : `<span class="stock-badge out">Out of Stock</span>`;
             const visual = (p.emoji && (p.emoji.startsWith('data:image') || p.emoji.startsWith('http')))
                 ? `<img src="${p.emoji}" alt="${p.name}" style="width:64px; height:64px; object-fit:cover; border-radius:12px; border:1px solid #3a4a32; display:block; margin:0 auto 10px;">`
@@ -109,7 +120,7 @@ async function renderProductsTab() {
                     <p class="lr-sub">${p.category} • ₹${p.price}/${p.unit}</p>
                     <div style="margin-top:10px; margin-bottom:10px;">${stockStatus} (${p.stock} ${p.unit})</div>
                     <div style="display:flex; gap:10px;">
-                        <button class="btn btn-sm btn-ghost" onclick="editProduct('${p.id}', '${p.name.replace(/'/g, "\\'")}', '${p.category}', '${p.unit}', ${p.price}, ${p.cost_price||0}, ${p.stock}, '${(p.emoji||'').replace(/'/g, "\\'")}')">Edit</button>
+                        <button class="btn btn-sm btn-ghost" onclick="editProduct('${p.id}')">Edit</button>
                         <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Delete</button>
                     </div>
                 </div>
@@ -184,17 +195,27 @@ function openProductModal() {
 }
 
 function editProduct(id, name, category, unit, price, cost_price, stock, existingImage) {
+    const p = currentFarmerProducts[id];
+    if (p) {
+        name = p.name;
+        category = p.category;
+        unit = p.unit;
+        price = p.price;
+        cost_price = p.cost_price;
+        stock = p.stock;
+        existingImage = p.emoji;
+    }
     const modal = document.getElementById('product-modal');
     modal.classList.add('show');
     modal.style.display = 'flex';
     document.getElementById('modal-title').textContent = 'Edit crop';
     document.getElementById('edit-product-id').value = id;
-    document.getElementById('f-name').value = name;
-    document.getElementById('f-category').value = category;
-    document.getElementById('f-unit').value = unit;
-    document.getElementById('f-price').value = price;
-    document.getElementById('f-cost').value = cost_price;
-    document.getElementById('f-stock').value = stock;
+    document.getElementById('f-name').value = name || '';
+    document.getElementById('f-category').value = category || 'Vegetable';
+    document.getElementById('f-unit').value = unit || 'kg';
+    document.getElementById('f-price').value = price || 0;
+    document.getElementById('f-cost').value = cost_price || 0;
+    document.getElementById('f-stock').value = stock || 0;
     currentCropImage = existingImage || '';
     const preview = document.getElementById('crop-img-preview');
     if (preview) {
@@ -359,7 +380,7 @@ async function renderRevenueTab() {
             html += `
                 <div class="list-row" style="border-bottom:1px solid var(--soil-panel-2); padding:10px 0;">
                     <div class="lr-left">
-                        <span class="lr-icon">${p.emoji || emojiFor(p.name)}</span>
+                        <span class="lr-icon">${renderCropVisual(p.emoji, p.name, 44)}</span>
                         <div>
                             <div class="lr-name">${p.name}</div>
                             <div class="lr-sub">${p.stock} ${p.unit} in stock</div>
@@ -404,7 +425,7 @@ async function renderStockTab() {
             html += `
                 <div class="list-row" style="border-bottom:1px solid var(--soil-panel-2); padding:10px 0;">
                     <div class="lr-left">
-                        <span class="lr-icon">${p.emoji || emojiFor(p.name)}</span>
+                        <span class="lr-icon">${renderCropVisual(p.emoji, p.name, 44)}</span>
                         <div>
                             <div class="lr-name">${p.name}</div>
                         </div>
