@@ -590,7 +590,8 @@ app.post('/api/procurement/bookings', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Missing required booking fields' });
     }
 
-    const { data: profile, error: profErr } = await supabase
+    const userClient = getUserClient(req);
+    const { data: profile, error: profErr } = await userClient
       .from('profiles')
       .select('id, full_name, avatar_url, delivery_note')
       .eq('id', req.user.id)
@@ -642,7 +643,7 @@ app.post('/api/procurement/bookings', authMiddleware, async (req, res) => {
     userProc.active = newBooking;
     const serialized = serializeProcurementData(userProc.note, userProc.active, userProc.completed);
 
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await userClient
       .from('profiles')
       .update({ delivery_note: serialized, updated_at: new Date() })
       .eq('id', req.user.id);
@@ -667,7 +668,8 @@ app.put('/api/procurement/bookings/:id/stage', authMiddleware, async (req, res) 
     const { stage } = req.body;
     const bookingId = req.params.id;
 
-    const { data: profile, error: profErr } = await supabase
+    const userClient = getUserClient(req);
+    const { data: profile, error: profErr } = await userClient
       .from('profiles')
       .select('id, delivery_note')
       .eq('id', req.user.id)
@@ -691,7 +693,7 @@ app.put('/api/procurement/bookings/:id/stage', authMiddleware, async (req, res) 
 
     const serialized = serializeProcurementData(userProc.note, userProc.active, userProc.completed);
 
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await userClient
       .from('profiles')
       .update({ delivery_note: serialized, updated_at: new Date() })
       .eq('id', req.user.id);
@@ -714,7 +716,8 @@ app.put('/api/procurement/bookings/:id/stage', authMiddleware, async (req, res) 
 app.delete('/api/procurement/bookings/:id', authMiddleware, async (req, res) => {
   try {
     const bookingId = req.params.id;
-    const { data: profile, error: profErr } = await supabase
+    const userClient = getUserClient(req);
+    const { data: profile, error: profErr } = await userClient
       .from('profiles')
       .select('id, delivery_note')
       .eq('id', req.user.id)
@@ -729,7 +732,7 @@ app.delete('/api/procurement/bookings/:id', authMiddleware, async (req, res) => 
 
     const serialized = serializeProcurementData(userProc.note, userProc.active, userProc.completed);
 
-    const { error: updateErr } = await supabase
+    const { error: updateErr } = await userClient
       .from('profiles')
       .update({ delivery_note: serialized, updated_at: new Date() })
       .eq('id', req.user.id);

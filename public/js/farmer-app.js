@@ -998,7 +998,9 @@ let selectedProcCenterId = 'apmc-pune';
 async function fetchProcurementData(centerId) {
   try {
     const cid = centerId || selectedProcCenterId;
-    const res = await KS_AUTH.apiFetch('/api/procurement/bookings?center_id=' + cid);
+    const rawRes = await KS_AUTH.apiFetch('/api/procurement/bookings?center_id=' + cid);
+    if (!rawRes || !rawRes.ok) return currentProcData;
+    const res = await rawRes.json();
     if (res && res.active !== undefined) {
       currentProcData = res;
       return res;
@@ -1401,10 +1403,12 @@ async function bookProcurementSlot() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Booking Slot...'; }
 
   try {
-    const res = await KS_AUTH.apiFetch('/api/procurement/bookings', {
+    const rawRes = await KS_AUTH.apiFetch('/api/procurement/bookings', {
       method: 'POST',
       body: { centerId, date, slot, cropName, qty, vehicle }
     });
+
+    const res = rawRes ? await rawRes.json() : {};
 
     if (res && res.error) {
       toast(res.error, '⚠️');
@@ -1427,10 +1431,11 @@ async function advanceActiveProcurementStage(bookingId, currentStage) {
   const nextStage = PROC_STAGES[stageIdx + 1];
 
   try {
-    const res = await KS_AUTH.apiFetch('/api/procurement/bookings/' + bookingId + '/stage', {
+    const rawRes = await KS_AUTH.apiFetch('/api/procurement/bookings/' + bookingId + '/stage', {
       method: 'PUT',
       body: { stage: nextStage }
     });
+    const res = rawRes ? await rawRes.json() : {};
 
     if (nextStage === 'weighbridge') {
       toast(tr('proc_alert_called','🔔 Your token is being called! Proceed to Weighbridge Bay.'), '🔔');
