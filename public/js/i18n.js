@@ -20,16 +20,19 @@
       "dev_by": "Developed by",
 
       // Landing Page
-      "hero_title": "Direct from Soil to Soul",
+      "hero_title": "Where the <em>harvest</em><br/>meets the home.",
       "hero_sub": "Connecting Indian farmers directly with consumers. Fresh harvests, transparent pricing, zero middlemen.",
       "farmer_card_title": "I am a Farmer",
       "farmer_card_desc": "List your fresh harvest, control your prices, track profits, and connect directly with local buyers.",
       "buyer_card_title": "I am a Buyer",
       "buyer_card_desc": "Buy farm-fresh vegetables, fruits, and grains directly from nearby verified farmers at honest rates.",
+      "btn_continue_farmer": "Continue as a Farmer",
+      "btn_continue_buyer": "Continue as a Buyer",
+      "scroll_hint": "a live look, not a mockup — everything on this page actually works",
       "contact_head": "Get in Touch",
-      "contact_sub": "Have questions, suggestions, or need support? Our team is always here to assist farmers and consumers.",
-      "contact_email_label": "Direct Support Email",
-      "team_label": "Hackathon Team",
+      "contact_sub": "Have questions about joining KisanSetu or need help with your account? We're here to help.",
+      "contact_email_label": "Email Us",
+      "team_label": "Developed By",
 
       // Auth Page
       "auth_title_signin": "Welcome back",
@@ -206,16 +209,19 @@
       "dev_by": "द्वारा विकसित",
 
       // Landing Page
-      "hero_title": "सीधे मिट्टी से आपकी थाली तक",
+      "hero_title": "जहाँ खेत की <em>उपज</em><br/>सीधे घर पहुँचती है।",
       "hero_sub": "भारतीय किसानों को सीधे उपभोक्ताओं से जोड़ना। ताजी फसलें, पारदर्शी दाम, बिना किसी बिचौलिए के।",
       "farmer_card_title": "मैं एक किसान हूँ",
       "farmer_card_desc": "अपनी ताज़ा फसल सूचीबद्ध करें, अपने दाम तय करें, मुनाफा ट्रैक करें और सीधे खरीदारों से जुड़ें।",
       "buyer_card_title": "मैं एक खरीदार हूँ",
       "buyer_card_desc": "आस-पास के सत्यापित किसानों से उचित दामों पर ताज़ी सब्जियां, फल और अनाज सीधे खरीदें।",
+      "btn_continue_farmer": "किसान के रूप में आगे बढ़ें",
+      "btn_continue_buyer": "खरीदार के रूप में आगे बढ़ें",
+      "scroll_hint": "एक वास्तविक मंच — इस पेज की हर चीज़ वास्तव में काम करती है",
       "contact_head": "हमसे संपर्क करें",
       "contact_sub": "क्या आपके कोई प्रश्न, सुझाव हैं या सहायता चाहिए? हमारी टीम किसानों और उपभोक्ताओं की मदद के लिए हमेशा तत्पर है।",
-      "contact_email_label": "सीधा सहायता ईमेल",
-      "team_label": "हैकथॉन टीम",
+      "contact_email_label": "ईमेल करें",
+      "team_label": "द्वारा विकसित",
 
       // Auth Page
       "auth_title_signin": "वापसी पर स्वागत है",
@@ -392,16 +398,19 @@
       "dev_by": "निर्माते",
 
       // Landing Page
-      "hero_title": "थेट मातीतून तुमच्या ताटात",
+      "hero_title": "जिथे शेतातील <em>धान्य</em><br/>थेट घरात पोहोचते.",
       "hero_sub": "भारतीय शेतकऱ्यांना थेट ग्राहकांशी जोडणारा सेतू. ताजी पिके, रास्त भाव आणि शून्य दलाल.",
       "farmer_card_title": "मी शेतकरी आहे",
       "farmer_card_desc": "आपली ताजी पिके जोडा, स्वतः भाव ठरवा, नफा तपासा आणि थेट स्थानिक ग्राहकांशी संपर्क साधा.",
       "buyer_card_title": "मी खरेदीदार आहे",
       "buyer_card_desc": "स्थानिक सत्यापित शेतकऱ्यांकडून थेट रास्त दरात ताजी फळे, भाजीपाला आणि धान्य खरेदी करा.",
+      "btn_continue_farmer": "शेतकरी म्हणून पुढे जा",
+      "btn_continue_buyer": "ग्राहक म्हणून पुढे जा",
+      "scroll_hint": "एक प्रत्यक्ष मंच — या पृष्ठावरील सर्वकाही प्रत्यक्षात कार्य करते",
       "contact_head": "आमच्याशी संपर्क साधा",
       "contact_sub": "काही प्रश्न, सूचना किंवा मदतीची गरज आहे? शेतकरी आणि ग्राहकांच्या सेवेसाठी आमची टीम सदैव तत्पर आहे.",
-      "contact_email_label": "थेट संपर्क ईमेल",
-      "team_label": "हॅकाथॉन टीम",
+      "contact_email_label": "ईमेल करा",
+      "team_label": "यांच्याद्वारे विकसित",
 
       // Auth Page
       "auth_title_signin": "पुन्हा स्वागत आहे",
@@ -596,6 +605,8 @@
           el.innerHTML = '';
           el.appendChild(ic);
           el.appendChild(document.createTextNode(val));
+        } else if (val.includes('<') && val.includes('>')) {
+          el.innerHTML = val;
         } else {
           el.textContent = val;
         }

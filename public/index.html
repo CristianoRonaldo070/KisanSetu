@@ -26,9 +26,9 @@
 <div id="landing">
   <div class="topbar">
     <div class="brand"><span class="dot"></span><span data-i18n="brand_name">KisanSetu</span></div>
-    <div style="display:flex; align-items:center; gap:16px;">
-      <div id="landing-lang-picker"></div>
-      <nav>
+    <div style="display:flex; align-items:center; gap:16px; pointer-events:auto;">
+      <div id="landing-lang-picker" style="pointer-events:auto; z-index:100;"></div>
+      <nav style="pointer-events:auto;">
         <a href="/auth.html?role=farmer" data-i18n="for_farmers" style="text-decoration:none;">For Farmers</a>
         <a href="/auth.html?role=consumer" data-i18n="for_buyers" style="text-decoration:none;">For Buyers</a>
         <a href="#contact" data-i18n="about" style="text-decoration:none;">About</a>
@@ -49,7 +49,7 @@
           <h3 data-i18n="farmer_card_title">I am a Farmer</h3>
           <p class="desc" data-i18n="farmer_card_desc">List your fresh harvest, control your prices, track profits, and connect directly with local buyers.</p>
         </div>
-        <button class="role-btn farmer-btn" onclick="window.location.href='/auth.html?role=farmer'" data-i18n="for_farmers">Continue as a Farmer</button>
+        <button class="role-btn farmer-btn" onclick="window.location.href='/auth.html?role=farmer'" data-i18n="btn_continue_farmer">Continue as a Farmer</button>
       </div>
       <div class="role-card consumer">
         <div>
@@ -57,12 +57,12 @@
           <h3 data-i18n="buyer_card_title">I am a Buyer</h3>
           <p class="desc" data-i18n="buyer_card_desc">Buy farm-fresh vegetables, fruits, and grains directly from nearby verified farmers at honest rates.</p>
         </div>
-        <button class="role-btn consumer-btn" onclick="window.location.href='/auth.html?role=consumer'" data-i18n="for_buyers">Continue as a Buyer</button>
+        <button class="role-btn consumer-btn" onclick="window.location.href='/auth.html?role=consumer'" data-i18n="btn_continue_buyer">Continue as a Buyer</button>
       </div>
       <div class="seam-badge">सेतु</div>
     </div>
 
-    <div class="hero-scroll-hint"><span class="line"></span> a live look, not a mockup — everything on this page actually works</div>
+    <div class="hero-scroll-hint"><span class="line"></span> <span data-i18n="scroll_hint">a live look, not a mockup — everything on this page actually works</span></div>
   </div>
 
   <div class="contact-section" id="contact">
@@ -105,7 +105,13 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const slot = document.getElementById('landing-lang-picker');
-  if (slot && window.KS_I18N) slot.innerHTML = KS_I18N.getSelectorHTML();
+  if (slot && window.KS_I18N) {
+    slot.innerHTML = KS_I18N.getSelectorHTML();
+    KS_I18N.translatePage();
+  }
+});
+window.addEventListener('ks_language_changed', () => {
+  if (window.KS_I18N) KS_I18N.translatePage();
 });
 
 /* =====================================================================

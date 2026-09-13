@@ -8,6 +8,15 @@ function renderCropVisual(emoji, name, size = 36) {
     return `<span style="font-size:${size > 30 ? '1.6rem' : '1.1rem'}; line-height:1;">${emoji || emojiFor(name) || '🌱'}</span>`;
 }
 
+function renderUserAvatar(avatarUrl, role = 'user', size = 40) {
+    if (avatarUrl && (avatarUrl.startsWith('data:image') || avatarUrl.startsWith('http'))) {
+        return `<div class="ur-avatar" style="width:${size}px; height:${size}px; border-radius:50%; overflow:hidden; border:2px solid #3a4a32; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center;"><img src="${avatarUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; display:block;"></div>`;
+    }
+    const defaultEmoji = role === 'farmer' ? '🧑‍🌾' : (role === 'consumer' ? '🛒' : '👤');
+    const fontSize = Math.round(size * 0.52);
+    return `<div class="ur-avatar" style="width:${size}px; height:${size}px; border-radius:50%; background:#283523; border:2px solid #3a4a32; display:inline-flex; align-items:center; justify-content:center; font-size:${fontSize}px; flex-shrink:0; line-height:1;">${defaultEmoji}</div>`;
+}
+
 let currentFarmerProducts = {};
 
 function toast(msg, icon) {
@@ -573,13 +582,32 @@ async function renderChatTab() {
 }
 
 async function searchUsers() {
-    const q = document.getElementById('user-search-input').value;
+    const q = document.getElementById('user-search-input').value.trim();
     if(!q) return;
     const resEl = document.getElementById('user-search-results');
     resEl.innerHTML = `<p>${tr('searching', 'Searching...')}</p>`;
     try {
-        const res = await KS_AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
-        const users = await res.json();
+        let users = [];
+        try {
+            const res = await KS_AUTH.apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`);
+            if (res && res.ok) {
+                users = await res.json();
+            }
+        } catch (e) {
+            console.warn('apiFetch users search note:', e);
+        }
+        
+        if ((!users || users.length === 0) && window.supabaseClient) {
+            try {
+                const user = await KS_AUTH.getUser();
+                let qb = window.supabaseClient.from('profiles').select('*').ilike('full_name', `%${q}%`);
+                if (user) qb = qb.neq('id', user.id);
+                const { data } = await qb;
+                if (data) users = data;
+            } catch (sbErr) {
+                console.warn('Direct supabase users search note:', sbErr);
+            }
+        }
         
         if(!users || users.length === 0) {
             resEl.innerHTML = `<p class="lr-sub">${tr('no_users_found', 'No users found.')}</p>`;
@@ -589,11 +617,11 @@ async function searchUsers() {
         let html = '';
         users.forEach(u => {
             html += `
-                <div class="panel user-result" style="display:flex; justify-content:space-between; align-items:center; padding:10px;">
-                    <div class="ur-left" style="display:flex; align-items:center; gap:10px;">
-                        <div class="ur-avatar" style="font-size:1.5rem;">👤</div>
+                <div class="panel user-result" style="display:flex; justify-content:space-between; align-items:center; padding:12px;">
+                    <div class="ur-left" style="display:flex; align-items:center; gap:12px;">
+                        ${renderUserAvatar(u.avatar_url, u.role, 42)}
                         <div>
-                            <div style="font-weight:bold;">${u.full_name || 'Unknown'}</div>
+                            <div style="font-weight:bold; font-size:.95rem;">${escapeChatHtml(u.full_name || 'Unknown')}</div>
                             <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${u.role === 'farmer' ? tr('role_farmer', 'Farmer') : tr('role_consumer', 'Consumer')}</div>
                         </div>
                     </div>
@@ -722,7 +750,10 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div><strong>${otherName}</strong> ${tr('sent_req_text', 'sent a request')}</div>
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        ${renderUserAvatar(otherUser.avatar_url, otherUser.role, 36)}
+                                        <div><strong>${otherName}</strong> ${tr('sent_req_text', 'sent a request')}</div>
+                                    </div>
                                     <div style="display:flex; gap:5px;">
                                         <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">${tr('btn_accept', 'Accept')}</button>
                                         <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">${tr('btn_decline', 'Decline')}</button>
@@ -734,7 +765,10 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${otherName}</strong></div>
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        ${renderUserAvatar(otherUser.avatar_url, otherUser.role, 36)}
+                                        <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${otherName}</strong></div>
+                                    </div>
                                     <div class="lr-sub">${tr('stat_pending', 'Pending')}</div>
                                 </div>
                             </div>
@@ -752,9 +786,10 @@ async function loadChatData() {
                 const otherUser = c.other_user || (isUserOne ? c.user_two_profile : c.user_one_profile) || {};
                 const otherName = otherUser.full_name || 'User';
                 const otherId = otherUser.id || (isUserOne ? c.user_two : c.user_one);
+                const otherAvatar = (otherUser.avatar_url || '').replace(/'/g, "\\'");
                 convHtml += `
-                    <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:10px;" onclick="openChat('${c.id}', '${otherId}', '${otherName.replace(/'/g, "\\'")}')">
-                        <div style="font-size:1.5rem;">👤</div>
+                    <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="openChat('${c.id}', '${otherId}', '${otherName.replace(/'/g, "\\'")}', '${otherAvatar}')">
+                        ${renderUserAvatar(otherUser.avatar_url, otherUser.role, 40)}
                         <div style="font-weight:bold;">${otherName}</div>
                     </div>
                 `;
@@ -856,7 +891,7 @@ async function uploadPhoto(input) {
             const user = await KS_AUTH.getUser();
             const client = window.supabaseClient;
             if (client && user) {
-                await client.from('profiles').upsert({ id: user.id, avatar_url: base64, role: 'farmer' });
+                await client.from('profiles').update({ avatar_url: base64 }).eq('id', user.id);
                 toast('Profile photo updated! 📸');
                 renderProfileTab();
             }
@@ -1057,15 +1092,20 @@ async function fetchAndRenderChatMessages(convId, isBackground = false) {
     }
 }
 
-async function openChat(convId, otherId, otherName) {
+async function openChat(convId, otherId, otherName, otherAvatarUrl) {
     activeConversationId = convId;
-    activeChatOtherUser = { id: otherId, name: otherName || 'User' };
+    activeChatOtherUser = { id: otherId, name: otherName || 'User', avatar_url: otherAvatarUrl || '' };
     
     const user = await KS_AUTH.getUser();
     activeChatCurrentUserId = user ? user.id : null;
     
     document.getElementById('chat-drawer').classList.add('open');
     document.getElementById('chat-name').textContent = otherName || 'User';
+    
+    const avatarEl = document.getElementById('chat-avatar');
+    if (avatarEl) {
+        avatarEl.innerHTML = renderUserAvatar(otherAvatarUrl, 'user', 34);
+    }
     
     const msgsEl = document.getElementById('chat-msgs');
     msgsEl.innerHTML = `<div style="text-align:center; padding:25px; color:var(--cream-dim);">${tr('loading', 'Loading messages...')}</div>`;

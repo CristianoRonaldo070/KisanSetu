@@ -1423,7 +1423,15 @@
 }
 
 /* ========== LANGUAGE PICKER STYLES ========== */
+#landing-lang-picker {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 50;
+}
 .ks-lang-picker {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 50;
   display: inline-flex;
   align-items: center;
   background: rgba(33, 44, 28, 0.85);
@@ -1434,6 +1442,7 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 .ks-lang-picker .lang-btn {
+  pointer-events: auto !important;
   background: transparent;
   border: none;
   color: var(--cream-dim);
