@@ -70,10 +70,12 @@
   AUTH.signInWithGoogle = async function(role) {
     // Store role in localStorage so we can set it after redirect
     if (role) localStorage.setItem('ks_signup_role', role);
+    const redirectUrl = window.location.origin + '/auth.html?callback=true';
+    console.log('Google OAuth redirectTo:', redirectUrl);
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + '/auth.html?callback=true',
+        redirectTo: redirectUrl,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent'
@@ -101,13 +103,16 @@
   
   // Redirect to appropriate dashboard based on role
   AUTH.redirectToDashboard = async function() {
-    const profile = await AUTH.getProfile();
-    if (profile) {
-      if (profile.role === 'farmer') {
-        window.location.href = '/farmer.html';
-      } else {
-        window.location.href = '/consumer.html';
-      }
+    let profile = await AUTH.getProfile();
+    if (!profile) {
+      // Small delay in case profile trigger is finishing
+      await new Promise(r => setTimeout(r, 600));
+      profile = await AUTH.getProfile();
+    }
+    if (profile && profile.role === 'farmer') {
+      window.location.href = '/farmer.html';
+    } else {
+      window.location.href = '/consumer.html';
     }
   };
   
