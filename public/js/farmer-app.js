@@ -405,31 +405,44 @@ async function updateStock(id) {
 }
 
 async function renderDeliveryTab() {
-    contentEl.innerHTML = '<p>Loading profile...</p>';
+    contentEl.innerHTML = '<p>Loading delivery settings...</p>';
     try {
-        const profile = await KS_AUTH.getProfile();
+        let profile = await KS_AUTH.getProfile();
+        const user = await KS_AUTH.getUser();
+        
+        if (!profile) {
+            profile = {
+                delivery_status: 'available',
+                delivery_note: '',
+                role: 'farmer'
+            };
+        }
+        
+        const currentStatus = profile.delivery_status || 'available';
+        const currentNote = profile.delivery_note || '';
         
         contentEl.innerHTML = `
-            <div class="panel" style="max-width:500px;">
+            <div class="panel" style="max-width:550px;">
                 <div class="form-grid">
                     <div class="form-field" style="grid-column:1/-1;">
-                        <label>Current Status</label>
+                        <label>Current Availability</label>
                         <select class="plain" id="d-status">
-                            <option value="available" ${profile.delivery_status==='available'?'selected':''}>🟢 Available</option>
-                            <option value="out" ${profile.delivery_status==='out'?'selected':''}>🚚 Out for delivery</option>
-                            <option value="off" ${profile.delivery_status==='off'?'selected':''}>🔴 Off duty</option>
+                            <option value="available" ${currentStatus==='available'?'selected':''}>🟢 Available for delivery / pickup</option>
+                            <option value="out" ${currentStatus==='out'?'selected':''}>🚚 Out for delivery right now</option>
+                            <option value="off" ${currentStatus==='off'?'selected':''}>🔴 Off duty (Closed today)</option>
                         </select>
                     </div>
                     <div class="form-field" style="grid-column:1/-1;">
-                        <label>Delivery Note (shows to consumers)</label>
-                        <input type="text" class="plain" id="d-note" value="${profile.delivery_note || ''}" placeholder="e.g. Delivering to market until 5 PM">
+                        <label>Delivery Note (shown to consumers on marketplace)</label>
+                        <input type="text" class="plain" id="d-note" value="${currentNote.replace(/"/g, '&quot;')}" placeholder="e.g. Free delivery within 5km, orders after 6 PM next day">
                     </div>
                 </div>
-                <button class="btn btn-primary" style="margin-top:15px;" onclick="saveDelivery()">Save Status</button>
+                <button class="btn btn-primary" style="margin-top:18px;" onclick="saveDelivery()">Save Availability</button>
             </div>
         `;
     } catch(e) {
-        contentEl.innerHTML = '<p style="color:var(--danger)">Error loading profile.</p>';
+        console.error('Delivery tab load error:', e);
+        contentEl.innerHTML = '<p style="color:var(--danger)">Error loading delivery settings: ' + (e.message || e) + '</p>';
     }
 }
 
@@ -437,14 +450,21 @@ async function saveDelivery() {
     const status = document.getElementById('d-status').value;
     const note = document.getElementById('d-note').value;
     try {
-        const res = await KS_AUTH.apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify({ delivery_status: status, delivery_note: note }) });
-        if(res.ok) {
-            toast('Delivery status updated');
-        } else {
-            toast('Failed to update', '❌');
+        const user = await KS_AUTH.getUser();
+        const client = window.supabaseClient;
+        if (client && user) {
+            await client.from('profiles').upsert({
+                id: user.id,
+                delivery_status: status,
+                delivery_note: note,
+                role: 'farmer'
+            });
         }
+        await KS_AUTH.apiFetch('/api/profile', { method: 'PUT', body: JSON.stringify({ delivery_status: status, delivery_note: note }) });
+        toast('Delivery status saved! 🚚');
     } catch(e) {
-        toast('Error updating status', '❌');
+        console.error('Save delivery error:', e);
+        toast('Error saving delivery status', '❌');
     }
 }
 
