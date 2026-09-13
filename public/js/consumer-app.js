@@ -10,6 +10,34 @@ function renderCropVisual(emoji, name, size = 36) {
 
 let cart = [];
 let consumerProductsMap = {};
+let sentChatRequests = new Set();
+
+async function syncSentRequests() {
+    try {
+        const user = await KS_AUTH.getUser();
+        if (!user) return;
+        let requests = [];
+        try {
+            const res = await KS_AUTH.apiFetch('/api/chat-requests');
+            if (res && res.ok) requests = await res.json();
+        } catch (e) {}
+        if ((!requests || requests.length === 0) && window.supabaseClient) {
+            try {
+                const { data } = await window.supabaseClient.from('chat_requests')
+                    .select('to_user_id')
+                    .eq('from_user_id', user.id);
+                if (data) requests = data;
+            } catch(e) {}
+        }
+        if (Array.isArray(requests)) {
+            requests.forEach(r => {
+                if (r.to_user_id) sentChatRequests.add(r.to_user_id);
+            });
+        }
+    } catch(err) {
+        console.warn('syncSentRequests note:', err);
+    }
+}
 
 function toast(msg, icon) {
   const stack = document.getElementById('toast-stack');
@@ -58,6 +86,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       console.warn('Chat init non-critical warning:', err);
     }
     
+    await syncSentRequests();
     renderBrowseTab();
 });
 
@@ -113,6 +142,10 @@ async function renderBrowseTab() {
                 ? `<img src="${p.emoji}" alt="${p.name}" style="width:56px; height:56px; object-fit:cover; border-radius:10px; border:1px solid #3a4a32;">`
                 : `<div style="font-size:2.8rem;">${p.emoji || emojiFor(p.name)}</div>`;
             
+            const hasSent = sentChatRequests.has(p.farmer_id);
+            const chatBtnText = hasSent ? ('✓ ' + tr('req_sent', 'Request Sent')) : tr('btn_chat_farmer', '💬 Chat');
+            const chatBtnStyle = hasSent ? 'border-color:var(--leaf-bright); color:var(--leaf-bright); background:rgba(127,166,83,0.18); cursor:default;' : '';
+
             html += `
                 <div class="panel cprod-card">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
@@ -126,7 +159,7 @@ async function renderBrowseTab() {
                     </div>
                     <div style="display:flex; gap:10px;">
                         <button class="btn btn-primary" style="flex:1;" onclick="addToCart('${p.id}')" ${p.stock>0?'':'disabled'}>${tr('btn_add_to_cart', 'Add to Cart')}</button>
-                        <button class="btn btn-ghost" onclick="requestChatWithFarmer('${p.farmer_id}')">${tr('btn_chat_farmer', '💬 Chat')}</button>
+                        <button class="btn btn-ghost" data-farmer-chat="${p.farmer_id}" onclick="requestChatWithFarmer('${p.farmer_id}', this)" ${hasSent ? 'disabled style="' + chatBtnStyle + '"' : ''}>${chatBtnText}</button>
                     </div>
                 </div>
             `;
@@ -138,31 +171,54 @@ async function renderBrowseTab() {
     }
 }
 
-async function requestChatWithFarmer(farmerId) {
+async function requestChatWithFarmer(farmerId, btnEl) {
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.textContent = '⏳ ' + tr('loading', 'Sending...');
+    }
     try {
         const client = window.supabaseClient;
         const user = await KS_AUTH.getUser();
+        let sent = false;
+        
         if (client && user) {
             const { error: directErr } = await client.from('chat_requests').insert({
                 from_user_id: user.id,
                 to_user_id: farmerId,
                 status: 'pending'
             });
-            if (!directErr) {
-                toast('Chat request sent to farmer!');
-                if (typeof loadChatData === 'function') loadChatData();
-                return;
-            }
+            if (!directErr) sent = true;
         }
-        const res = await KS_AUTH.apiFetch('/api/chat-requests', { method: 'POST', body: JSON.stringify({ to_user_id: farmerId }) });
-        if(res && res.ok) {
-            toast('Chat request sent to farmer!');
+        
+        if (!sent) {
+            const res = await KS_AUTH.apiFetch('/api/chat-requests', { method: 'POST', body: JSON.stringify({ to_user_id: farmerId }) });
+            if (res && res.ok) sent = true;
+        }
+
+        if (sent) {
+            sentChatRequests.add(farmerId);
+            document.querySelectorAll(`[data-farmer-chat="${farmerId}"]`).forEach(btn => {
+                btn.textContent = '✓ ' + tr('req_sent', 'Request Sent');
+                btn.disabled = true;
+                btn.style.borderColor = 'var(--leaf-bright)';
+                btn.style.color = 'var(--leaf-bright)';
+                btn.style.background = 'rgba(127,166,83,0.18)';
+                btn.style.cursor = 'default';
+            });
+            toast(tr('chat_req_sent', 'Chat request sent to farmer! 📩'));
             if (typeof loadChatData === 'function') loadChatData();
         } else {
-            const errData = res ? await res.json().catch(() => ({})) : {};
-            toast(errData.error || 'Could not send chat request', '❌');
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.textContent = tr('btn_chat_farmer', '💬 Chat');
+            }
+            toast('Could not send chat request', '❌');
         }
     } catch(e) {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.textContent = tr('btn_chat_farmer', '💬 Chat');
+        }
         toast('Error: ' + e.message, '❌');
     }
 }
@@ -313,6 +369,10 @@ function findNearby() {
             let html = '<div style="display:grid; gap:15px;">';
             farmers.forEach(f => {
                 const statusDot = `<span class="status-dot ${f.delivery_status || 'off'}"></span>`;
+                const hasSent = sentChatRequests.has(f.id);
+                const btnText = hasSent ? ('✓ ' + tr('req_sent', 'Request Sent')) : tr('btn_send_request', 'Send Request');
+                const btnStyle = hasSent ? 'border-color:var(--leaf-bright); color:var(--leaf-bright); background:rgba(127,166,83,0.18); cursor:default;' : '';
+
                 html += `
                     <div class="panel nearby-card" style="display:flex; justify-content:space-between; align-items:center;">
                         <div class="nc-top" style="display:flex; gap:15px; align-items:center;">
@@ -322,7 +382,7 @@ function findNearby() {
                                 <div class="lr-sub nc-distance">${f.city || 'Unknown City'}</div>
                             </div>
                         </div>
-                        <button class="btn btn-water" onclick="requestChatWithFarmer('${f.id}')">${tr('btn_send_request', 'Send Request')}</button>
+                        <button class="btn ${hasSent?'btn-ghost':'btn-water'}" data-farmer-chat="${f.id}" onclick="requestChatWithFarmer('${f.id}', this)" ${hasSent ? 'disabled style="' + btnStyle + '"' : ''}>${btnText}</button>
                     </div>
                 `;
             });
@@ -379,6 +439,10 @@ async function searchUsers() {
         
         let html = '';
         users.forEach(u => {
+            const hasSent = sentChatRequests.has(u.id);
+            const btnText = hasSent ? ('✓ ' + tr('req_sent', 'Request Sent')) : tr('btn_send_request', 'Send Request');
+            const btnStyle = hasSent ? 'border-color:var(--leaf-bright); color:var(--leaf-bright); background:rgba(127,166,83,0.18); cursor:default;' : '';
+
             html += `
                 <div class="panel user-result" style="display:flex; justify-content:space-between; align-items:center; padding:10px;">
                     <div class="ur-left" style="display:flex; align-items:center; gap:10px;">
@@ -388,7 +452,7 @@ async function searchUsers() {
                             <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${tr('role_farmer', 'Farmer')}</div>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-water" onclick="requestChatWithFarmer('${u.id}')">${tr('btn_send_request', 'Send Request')}</button>
+                    <button class="btn btn-sm ${hasSent?'btn-ghost':'btn-water'}" data-farmer-chat="${u.id}" onclick="requestChatWithFarmer('${u.id}', this)" ${hasSent ? 'disabled style="' + btnStyle + '"' : ''}>${btnText}</button>
                 </div>
             `;
         });
@@ -399,27 +463,76 @@ async function searchUsers() {
 }
 
 async function loadChatData() {
+    const pendingEl = document.getElementById('pending-requests');
+    const activeEl = document.getElementById('active-conversations');
     try {
-        const [reqRes, convRes] = await Promise.all([
-            KS_AUTH.apiFetch('/api/chat-requests'),
-            KS_AUTH.apiFetch('/api/conversations')
-        ]);
+        const user = await KS_AUTH.getUser();
+        if (!user) return;
         
-        const requests = await reqRes.json();
-        const conversations = await convRes.json();
+        let requests = [];
+        let conversations = [];
         
-        const pendingEl = document.getElementById('pending-requests');
-        const activeEl = document.getElementById('active-conversations');
+        try {
+            const reqRes = await KS_AUTH.apiFetch('/api/chat-requests');
+            if (reqRes && reqRes.ok) {
+                requests = await reqRes.json();
+            }
+        } catch(e) {
+            console.warn('apiFetch /api/chat-requests note:', e);
+        }
         
-        if(pendingEl) {
+        if ((!requests || !Array.isArray(requests) || requests.length === 0) && window.supabaseClient) {
+            try {
+                const { data } = await window.supabaseClient.from('chat_requests')
+                    .select('*, from_user:profiles!chat_requests_from_user_id_fkey(id, full_name, avatar_url), to_user:profiles!chat_requests_to_user_id_fkey(id, full_name, avatar_url)')
+                    .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
+                if (data && data.length > 0) requests = data;
+            } catch (err) {
+                console.warn('Direct chat_requests note:', err);
+            }
+        }
+
+        try {
+            const convRes = await KS_AUTH.apiFetch('/api/conversations');
+            if (convRes && convRes.ok) {
+                conversations = await convRes.json();
+            }
+        } catch(e) {
+            console.warn('apiFetch /api/conversations note:', e);
+        }
+
+        if ((!conversations || !Array.isArray(conversations) || conversations.length === 0) && window.supabaseClient) {
+            try {
+                const { data } = await window.supabaseClient.from('conversations')
+                    .select('*, user_one_profile:profiles!conversations_user_one_fkey(id, full_name, avatar_url), user_two_profile:profiles!conversations_user_two_fkey(id, full_name, avatar_url)')
+                    .or(`user_one.eq.${user.id},user_two.eq.${user.id}`);
+                if (data && data.length > 0) conversations = data;
+            } catch (err) {
+                console.warn('Direct conversations note:', err);
+            }
+        }
+
+        if (!Array.isArray(requests)) requests = [];
+        if (!Array.isArray(conversations)) conversations = [];
+        
+        // Track sent requests
+        requests.forEach(r => {
+            if (r.to_user_id) sentChatRequests.add(r.to_user_id);
+        });
+
+        if (pendingEl) {
             let reqHtml = '';
             requests.forEach(r => {
-                if(r.status === 'pending') {
-                    if(r.is_incoming) {
+                if (r.status === 'pending') {
+                    const isIncoming = (r.is_incoming !== undefined) ? r.is_incoming : (r.to_user_id === user.id);
+                    const otherUser = r.other_user || (isIncoming ? r.from_user : r.to_user) || {};
+                    const otherName = otherUser.full_name || 'User';
+                    
+                    if (isIncoming) {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div><strong>${r.other_user.full_name}</strong> ${tr('sent_req_text', 'sent a request')}</div>
+                                    <div><strong>${otherName}</strong> ${tr('sent_req_text', 'sent a request')}</div>
                                     <div style="display:flex; gap:5px;">
                                         <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">${tr('btn_accept', 'Accept')}</button>
                                         <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">${tr('btn_decline', 'Decline')}</button>
@@ -431,7 +544,7 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${r.other_user.full_name}</strong></div>
+                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${otherName}</strong></div>
                                     <div class="lr-sub">${tr('stat_pending', 'Pending')}</div>
                                 </div>
                             </div>
@@ -442,14 +555,17 @@ async function loadChatData() {
             pendingEl.innerHTML = reqHtml || `<p class="lr-sub">${tr('no_pending_req', 'No pending requests.')}</p>`;
         }
         
-        if(activeEl) {
+        if (activeEl) {
             let convHtml = '';
             conversations.forEach(c => {
-                const other = c.other_user;
+                const isUserOne = c.user_one === user.id;
+                const otherUser = c.other_user || (isUserOne ? c.user_two_profile : c.user_one_profile) || {};
+                const otherName = otherUser.full_name || 'User';
+                const otherId = otherUser.id || (isUserOne ? c.user_two : c.user_one);
                 convHtml += `
-                    <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:10px;" onclick="openChat('${c.id}', '${other.id}', '${other.full_name}')">
+                    <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:10px;" onclick="openChat('${c.id}', '${otherId}', '${otherName.replace(/'/g, "\\'")}')">
                         <div style="font-size:1.5rem;">🧑‍🌾</div>
-                        <div style="font-weight:bold;">${other.full_name}</div>
+                        <div style="font-weight:bold;">${otherName}</div>
                     </div>
                 `;
             });
@@ -457,14 +573,16 @@ async function loadChatData() {
         }
         
     } catch(e) {
-        console.error(e);
+        console.error('loadChatData error:', e);
+        if (pendingEl) pendingEl.innerHTML = `<p class="lr-sub">${tr('no_pending_req', 'No pending requests.')}</p>`;
+        if (activeEl) activeEl.innerHTML = `<p class="lr-sub">${tr('no_active_conv', 'No active conversations.')}</p>`;
     }
 }
 
 async function respondReq(id, status) {
     try {
         const res = await KS_AUTH.apiFetch(`/api/chat-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
-        if(res.ok) {
+        if(res && res.ok) {
             toast(`Request ${status}`);
             loadChatData();
         } else {

@@ -279,8 +279,24 @@ app.get('/api/chat-requests', authMiddleware, async (req, res) => {
       .select('*, from_user:profiles!chat_requests_from_user_id_fkey(id, full_name, avatar_url), to_user:profiles!chat_requests_to_user_id_fkey(id, full_name, avatar_url)')
       .or(`from_user_id.eq.${req.user.id},to_user_id.eq.${req.user.id}`);
     if (error) throw error;
-    res.json(data);
+    
+    const mapped = (data || []).map(r => {
+      const is_incoming = r.to_user_id === req.user.id;
+      const rawOther = is_incoming ? (r.from_user || {}) : (r.to_user || {});
+      const other_user = {
+        id: rawOther.id || (is_incoming ? r.from_user_id : r.to_user_id),
+        full_name: rawOther.full_name || 'User',
+        avatar_url: rawOther.avatar_url || ''
+      };
+      return {
+        ...r,
+        is_incoming,
+        other_user
+      };
+    });
+    res.json(mapped);
   } catch (err) {
+    console.error('GET /api/chat-requests error:', err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -313,7 +329,25 @@ app.put('/api/chat-requests/:id', authMiddleware, async (req, res) => {
       .select().single();
     if (error) throw error;
     
-    // Status update logic/conversation creation is handled by DB trigger on accept
+    // Status update logic/conversation creation fallback if DB trigger is absent
+    if (status === 'accepted') {
+      try {
+        const { data: existingConv } = await client.from('conversations')
+          .select('id')
+          .eq('chat_request_id', data.id)
+          .maybeSingle();
+        if (!existingConv) {
+          await client.from('conversations').insert({
+            user_one: data.from_user_id,
+            user_two: data.to_user_id,
+            chat_request_id: data.id
+          });
+        }
+      } catch (convErr) {
+        console.warn('Conversation creation note:', convErr);
+      }
+    }
+    
     io.to(`user_${data.from_user_id}`).emit('chat_request_updated', data);
     res.json(data);
   } catch (err) {
@@ -329,8 +363,23 @@ app.get('/api/conversations', authMiddleware, async (req, res) => {
       .select('*, user_one_profile:profiles!conversations_user_one_fkey(id, full_name, avatar_url), user_two_profile:profiles!conversations_user_two_fkey(id, full_name, avatar_url)')
       .or(`user_one.eq.${req.user.id},user_two.eq.${req.user.id}`);
     if (error) throw error;
-    res.json(data);
+    
+    const mapped = (data || []).map(c => {
+      const isUserOne = c.user_one === req.user.id;
+      const rawOther = isUserOne ? (c.user_two_profile || {}) : (c.user_one_profile || {});
+      const other_user = {
+        id: rawOther.id || (isUserOne ? c.user_two : c.user_one),
+        full_name: rawOther.full_name || 'User',
+        avatar_url: rawOther.avatar_url || ''
+      };
+      return {
+        ...c,
+        other_user
+      };
+    });
+    res.json(mapped);
   } catch (err) {
+    console.error('GET /api/conversations error:', err);
     res.status(400).json({ error: err.message });
   }
 });

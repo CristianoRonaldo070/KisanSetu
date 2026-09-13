@@ -597,7 +597,7 @@ async function searchUsers() {
                             <div class="lr-sub" style="font-size:0.8rem; text-transform:capitalize;">${u.role === 'farmer' ? tr('role_farmer', 'Farmer') : tr('role_consumer', 'Consumer')}</div>
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-water" onclick="sendChatReq('${u.id}')">${tr('btn_send_request', 'Send Request')}</button>
+                    <button class="btn btn-sm btn-water" onclick="sendChatReq('${u.id}', this)">${tr('btn_send_request', 'Send Request')}</button>
                 </div>
             `;
         });
@@ -607,57 +607,122 @@ async function searchUsers() {
     }
 }
 
-async function sendChatReq(toUserId) {
+async function sendChatReq(toUserId, btnEl) {
+    if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.textContent = '⏳ ' + tr('loading', 'Sending...');
+    }
     try {
         const client = window.supabaseClient;
         const user = await KS_AUTH.getUser();
+        let sent = false;
+        
         if (client && user) {
             const { error: directErr } = await client.from('chat_requests').insert({
                 from_user_id: user.id,
                 to_user_id: toUserId,
                 status: 'pending'
             });
-            if (!directErr) {
-                toast(tr('chat_req_sent', 'Chat request sent!'));
-                loadChatData();
-                return;
-            }
+            if (!directErr) sent = true;
         }
-        const res = await KS_AUTH.apiFetch('/api/chat-requests', { method: 'POST', body: JSON.stringify({ to_user_id: toUserId }) });
-        if(res && res.ok) {
-            toast(tr('chat_req_sent', 'Chat request sent!'));
+        
+        if (!sent) {
+            const res = await KS_AUTH.apiFetch('/api/chat-requests', { method: 'POST', body: JSON.stringify({ to_user_id: toUserId }) });
+            if (res && res.ok) sent = true;
+        }
+
+        if (sent) {
+            toast(tr('chat_req_sent_user', 'Chat request sent! 📩'));
+            if (btnEl) {
+                btnEl.textContent = '✓ ' + tr('req_sent', 'Request Sent');
+                btnEl.disabled = true;
+                btnEl.style.borderColor = 'var(--leaf-bright)';
+                btnEl.style.color = 'var(--leaf-bright)';
+                btnEl.style.background = 'rgba(127,166,83,0.18)';
+            }
             loadChatData();
         } else {
-            const errData = res ? await res.json().catch(() => ({})) : {};
-            toast(errData.error || 'Failed to send request', '❌');
+            if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.textContent = tr('btn_send_request', 'Send Request');
+            }
+            toast('Failed to send request', '❌');
         }
     } catch(e) {
+        if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.textContent = tr('btn_send_request', 'Send Request');
+        }
         toast('Error sending request: ' + e.message, '❌');
     }
 }
 
 async function loadChatData() {
+    const pendingEl = document.getElementById('pending-requests');
+    const activeEl = document.getElementById('active-conversations');
     try {
-        const [reqRes, convRes] = await Promise.all([
-            KS_AUTH.apiFetch('/api/chat-requests'),
-            KS_AUTH.apiFetch('/api/conversations')
-        ]);
+        const user = await KS_AUTH.getUser();
+        if (!user) return;
         
-        const requests = await reqRes.json();
-        const conversations = await convRes.json();
+        let requests = [];
+        let conversations = [];
         
-        const pendingEl = document.getElementById('pending-requests');
-        const activeEl = document.getElementById('active-conversations');
+        try {
+            const reqRes = await KS_AUTH.apiFetch('/api/chat-requests');
+            if (reqRes && reqRes.ok) {
+                requests = await reqRes.json();
+            }
+        } catch(e) {
+            console.warn('apiFetch /api/chat-requests note:', e);
+        }
         
-        if(pendingEl) {
+        if ((!requests || !Array.isArray(requests) || requests.length === 0) && window.supabaseClient) {
+            try {
+                const { data } = await window.supabaseClient.from('chat_requests')
+                    .select('*, from_user:profiles!chat_requests_from_user_id_fkey(id, full_name, avatar_url), to_user:profiles!chat_requests_to_user_id_fkey(id, full_name, avatar_url)')
+                    .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
+                if (data && data.length > 0) requests = data;
+            } catch (err) {
+                console.warn('Direct chat_requests note:', err);
+            }
+        }
+
+        try {
+            const convRes = await KS_AUTH.apiFetch('/api/conversations');
+            if (convRes && convRes.ok) {
+                conversations = await convRes.json();
+            }
+        } catch(e) {
+            console.warn('apiFetch /api/conversations note:', e);
+        }
+
+        if ((!conversations || !Array.isArray(conversations) || conversations.length === 0) && window.supabaseClient) {
+            try {
+                const { data } = await window.supabaseClient.from('conversations')
+                    .select('*, user_one_profile:profiles!conversations_user_one_fkey(id, full_name, avatar_url), user_two_profile:profiles!conversations_user_two_fkey(id, full_name, avatar_url)')
+                    .or(`user_one.eq.${user.id},user_two.eq.${user.id}`);
+                if (data && data.length > 0) conversations = data;
+            } catch (err) {
+                console.warn('Direct conversations note:', err);
+            }
+        }
+
+        if (!Array.isArray(requests)) requests = [];
+        if (!Array.isArray(conversations)) conversations = [];
+        
+        if (pendingEl) {
             let reqHtml = '';
             requests.forEach(r => {
-                if(r.status === 'pending') {
-                    if(r.is_incoming) {
+                if (r.status === 'pending') {
+                    const isIncoming = (r.is_incoming !== undefined) ? r.is_incoming : (r.to_user_id === user.id);
+                    const otherUser = r.other_user || (isIncoming ? r.from_user : r.to_user) || {};
+                    const otherName = otherUser.full_name || 'User';
+                    
+                    if (isIncoming) {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div><strong>${r.other_user.full_name}</strong> ${tr('sent_req_text', 'sent a request')}</div>
+                                    <div><strong>${otherName}</strong> ${tr('sent_req_text', 'sent a request')}</div>
                                     <div style="display:flex; gap:5px;">
                                         <button class="btn btn-sm btn-primary" onclick="respondReq('${r.id}', 'accepted')">${tr('btn_accept', 'Accept')}</button>
                                         <button class="btn btn-sm btn-ghost" onclick="respondReq('${r.id}', 'declined')">${tr('btn_decline', 'Decline')}</button>
@@ -669,7 +734,7 @@ async function loadChatData() {
                         reqHtml += `
                             <div class="panel request-card" style="padding:10px;">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${r.other_user.full_name}</strong></div>
+                                    <div>${tr('you_requested_chat', 'You requested to chat with')} <strong>${otherName}</strong></div>
                                     <div class="lr-sub">${tr('stat_pending', 'Pending')}</div>
                                 </div>
                             </div>
@@ -680,14 +745,17 @@ async function loadChatData() {
             pendingEl.innerHTML = reqHtml || `<p class="lr-sub">${tr('no_pending_req', 'No pending requests.')}</p>`;
         }
         
-        if(activeEl) {
+        if (activeEl) {
             let convHtml = '';
             conversations.forEach(c => {
-                const other = c.other_user;
+                const isUserOne = c.user_one === user.id;
+                const otherUser = c.other_user || (isUserOne ? c.user_two_profile : c.user_one_profile) || {};
+                const otherName = otherUser.full_name || 'User';
+                const otherId = otherUser.id || (isUserOne ? c.user_two : c.user_one);
                 convHtml += `
-                    <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:10px;" onclick="openChat('${c.id}', '${other.id}', '${other.full_name}')">
+                    <div class="panel" style="padding:10px; cursor:pointer; display:flex; align-items:center; gap:10px;" onclick="openChat('${c.id}', '${otherId}', '${otherName.replace(/'/g, "\\'")}')">
                         <div style="font-size:1.5rem;">👤</div>
-                        <div style="font-weight:bold;">${other.full_name}</div>
+                        <div style="font-weight:bold;">${otherName}</div>
                     </div>
                 `;
             });
@@ -695,14 +763,16 @@ async function loadChatData() {
         }
         
     } catch(e) {
-        console.error(e);
+        console.error('loadChatData error:', e);
+        if (pendingEl) pendingEl.innerHTML = `<p class="lr-sub">${tr('no_pending_req', 'No pending requests.')}</p>`;
+        if (activeEl) activeEl.innerHTML = `<p class="lr-sub">${tr('no_active_conv', 'No active conversations.')}</p>`;
     }
 }
 
 async function respondReq(id, status) {
     try {
         const res = await KS_AUTH.apiFetch(`/api/chat-requests/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
-        if(res.ok) {
+        if(res && res.ok) {
             toast(`Request ${status}`);
             loadChatData();
         } else {

@@ -179,7 +179,8 @@
       "added_to_cart": "added to cart!",
       "btn_checkout": "Place Order",
       "order_success": "Order placed successfully! 🎉",
-      "chat_req_sent": "Chat request sent!",
+      "chat_req_sent": "Chat request sent to farmer! 📩",
+      "req_sent": "Request Sent",
       "save_profile_success": "Profile saved successfully! 🎉"
     },
 
@@ -359,7 +360,8 @@
       "added_to_cart": "कार्ट में जोड़ा गया!",
       "btn_checkout": "ऑर्डर दें",
       "order_success": "ऑर्डर सफलतापूर्वक दर्ज किया गया! 🎉",
-      "chat_req_sent": "चैट अनुरोध भेजा गया!",
+      "chat_req_sent": "किसान को चैट अनुरोध भेज दिया गया! 📩",
+      "req_sent": "अनुरोध भेजा गया",
       "save_profile_success": "प्रोफाइल सफलतापूर्वक सहेजी गई! 🎉"
     },
 
@@ -539,7 +541,8 @@
       "added_to_cart": "खरेदी टोपलीत जोडले!",
       "btn_checkout": "ऑर्डर करा",
       "order_success": "ऑर्डर यशस्वीरीत्या नोंदवली गेली! 🎉",
-      "chat_req_sent": "चॅट विनंती पाठवली!",
+      "chat_req_sent": "शेतकऱ्याला चॅट विनंती पाठवली! 📩",
+      "req_sent": "विनंती पाठवली",
       "save_profile_success": "प्रोफाइल यशस्वीरीत्या जतन केली! 🎉"
     }
   };
